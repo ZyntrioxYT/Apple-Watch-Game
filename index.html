@@ -819,6 +819,32 @@
 
     setDifficulty('normal');
 
+    // ── Bot mode (secret: tap title 5 times) ─────────────────
+    let botMode = false;
+    let titleTaps = 0, titleTapTimer;
+    let botTapTimeout;
+
+    document.querySelector('h1').addEventListener('click', () => {
+      clearTimeout(titleTapTimer);
+      titleTaps++;
+      titleTapTimer = setTimeout(() => { titleTaps = 0; }, 1000);
+      if (titleTaps >= 5) {
+        titleTaps = 0;
+        botMode = !botMode;
+        const subtitle = document.querySelector('.subtitle');
+        subtitle.textContent = botMode ? '🤖 Bot mode on' : 'How fast are you?';
+        subtitle.style.color = botMode ? '#00c853' : '';
+        if (!botMode) clearTimeout(botTapTimeout);
+      }
+    });
+
+    function scheduleBotTap() {
+      if (!botMode || !ready) return;
+      // Realistic human reaction: 180–320ms with slight variance
+      const delay = 180 + Math.random() * 140 + (Math.random() < 0.1 ? 80 : 0);
+      botTapTimeout = setTimeout(() => { if (ready && botMode) handleTap(); }, delay);
+    }
+
     // ── Game state ────────────────────────────────────────────
     let waiting = false, ready = false, running = false;
     let startTime = 0, streak = 0;
@@ -874,6 +900,7 @@
         gameSub.textContent  = difficulty === 'hard' ? 'Be quick!' : '';
         startTime = Date.now();
         ready = true;
+        if (botMode) scheduleBotTap();
 
         if (cfg.window) {
           windowTimeout = setTimeout(() => {
@@ -929,7 +956,7 @@
           gameSub.textContent = '';
         }
 
-        saveScore(reaction);
+        if (!botMode) saveScore(reaction);
         waiting = false;
         ready = false;
         updateStats();
