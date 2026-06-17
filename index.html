@@ -4,6 +4,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reaction Game</title>
   <style>
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
@@ -13,49 +15,48 @@
       user-select: none;
     }
 
-    h1 {
-      font-size: 26px;
-      margin: 15px 0 5px;
-    }
-
-    #game {
-      margin: 10px auto;
-      width: 90vw;
-      max-width: 350px;
-      height: 230px;
-      border-radius: 25px;
-      background: #333;
+    /* ── Auth bar ── */
+    #auth-bar {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      font-size: 26px;
-      padding: 10px;
-      box-sizing: border-box;
-      transition: background 0.1s;
+      justify-content: flex-end;
+      padding: 10px 16px;
+      gap: 10px;
+      min-height: 52px;
     }
 
-    #game.flash {
-      animation: flash 0.25s ease-out;
+    #auth-bar img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
     }
 
-    @keyframes flash {
-      0%   { filter: brightness(2); }
-      100% { filter: brightness(1); }
+    #auth-bar span {
+      font-size: 14px;
+      color: #ccc;
     }
 
-    #game-sub {
-      font-size: 15px;
-      opacity: 0.7;
-      margin-top: 6px;
-      min-height: 20px;
+    .auth-btn {
+      font-size: 14px;
+      padding: 7px 14px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
     }
 
+    #sign-in-btn  { background: white; color: #333; }
+    #sign-out-btn { background: #333;  color: #aaa; }
+
+    /* ── Title ── */
+    h1 { font-size: 26px; margin: 0 0 8px; }
+
+    /* ── Difficulty ── */
     #difficulty-row {
-      margin: 8px auto;
       display: flex;
       justify-content: center;
       gap: 8px;
+      margin-bottom: 8px;
     }
 
     .diff-btn {
@@ -74,39 +75,43 @@
       background: #1a3a27;
     }
 
-    button {
-      font-size: 24px;
-      padding: 18px 25px;
-      border: none;
-      border-radius: 18px;
-      margin: 8px;
-      cursor: pointer;
+    /* ── Game box ── */
+    #game {
+      margin: 0 auto 6px;
+      width: 90vw;
+      max-width: 350px;
+      height: 230px;
+      border-radius: 25px;
+      background: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      padding: 10px;
+      transition: background 0.1s;
     }
 
-    #stats {
+    #game.flash { animation: flash 0.25s ease-out; }
+
+    @keyframes flash {
+      0%   { filter: brightness(2); }
+      100% { filter: brightness(1); }
+    }
+
+    #game-sub {
       font-size: 15px;
-      color: #aaa;
-      margin: 6px 0;
+      opacity: 0.75;
+      margin-top: 6px;
       min-height: 20px;
     }
 
-    #leaderboard {
-      font-size: 18px;
-      margin-top: 10px;
-    }
-
-    #leaderboard ol {
-      padding-left: 0;
-      list-style: none;
-    }
-
-    #leaderboard li {
-      padding: 4px 0;
-    }
-
-    #leaderboard li.best {
-      color: gold;
-      font-weight: bold;
+    /* ── Stats ── */
+    #stats {
+      font-size: 15px;
+      color: #aaa;
+      margin: 4px 0 6px;
+      min-height: 20px;
     }
 
     .streak-badge {
@@ -119,27 +124,78 @@
       margin-left: 6px;
     }
 
-    input {
-      font-size: 20px;
-      width: 130px;
-      text-align: center;
-      border-radius: 12px;
+    /* ── Buttons ── */
+    .game-btn {
+      font-size: 24px;
+      padding: 18px 25px;
       border: none;
-      padding: 8px;
-      margin-bottom: 6px;
+      border-radius: 18px;
+      margin: 6px;
+      cursor: pointer;
     }
+
+    /* ── Guest notice ── */
+    #guest-notice {
+      font-size: 13px;
+      color: #888;
+      margin: 6px 0 2px;
+      min-height: 18px;
+    }
+
+    /* ── Leaderboard ── */
+    #leaderboard { font-size: 18px; margin-top: 10px; padding-bottom: 30px; }
+
+    #leaderboard ol {
+      padding: 0;
+      list-style: none;
+      margin: 0 auto;
+      max-width: 350px;
+    }
+
+    #leaderboard li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: 10px;
+    }
+
+    #leaderboard li.best { background: #2a2500; }
+
+    #leaderboard li img {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+    }
+
+    #leaderboard li .rank { color: #888; width: 22px; text-align: right; flex-shrink: 0; }
+    #leaderboard li.best .rank { color: gold; }
+    #leaderboard li .lname { flex: 1; text-align: left; }
+    #leaderboard li.best .lname { color: gold; font-weight: bold; }
+    #leaderboard li .ltime { color: #aaa; font-size: 15px; }
+    #leaderboard li.best .ltime { color: gold; }
+
+    #lb-empty { color: #555; font-size: 15px; margin-top: 10px; }
   </style>
 </head>
 <body>
 
+  <!-- Auth bar -->
+  <div id="auth-bar">
+    <div id="user-info" style="display:none; align-items:center; gap:8px;">
+      <img id="user-photo" src="" alt="">
+      <span id="user-name"></span>
+      <button class="auth-btn" id="sign-out-btn" onclick="signOut()">Sign out</button>
+    </div>
+    <button class="auth-btn" id="sign-in-btn" onclick="signIn()">Sign in with Google</button>
+  </div>
+
   <h1>Reaction Time</h1>
 
-  <input id="name" placeholder="Name" maxlength="8">
-
   <div id="difficulty-row">
-    <button class="diff-btn active" onclick="setDifficulty('easy')">Easy</button>
-    <button class="diff-btn active" id="diff-normal" onclick="setDifficulty('normal')">Normal</button>
-    <button class="diff-btn" id="diff-hard" onclick="setDifficulty('hard')">Hard</button>
+    <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
+    <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
+    <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
   </div>
 
   <div id="game">
@@ -149,17 +205,70 @@
 
   <div id="stats"></div>
 
-  <button onclick="startGame()">Start</button>
-  <button onclick="resetScores()">Reset</button>
+  <button class="game-btn" onclick="startGame()">Start</button>
+  <button class="game-btn" onclick="stopGame()">Stop</button>
+
+  <div id="guest-notice"></div>
 
   <div id="leaderboard">
-    <h2>Leaderboard</h2>
-    <ol id="scores"></ol>
+    <h2>Global Leaderboard</h2>
+    <ol id="scores"><li id="lb-empty">Loading...</li></ol>
   </div>
 
-  <audio id="tap-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <script>
+    // ── Firebase init ──────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyDDnBWZOwrPxCJcOPsAajx0cMmbyHTf6dY",
+      authDomain: "apple-watch-game.firebaseapp.com",
+      projectId: "apple-watch-game",
+      storageBucket: "apple-watch-game.firebasestorage.app",
+      messagingSenderId: "448909758594",
+      appId: "1:448909758594:web:446d2ad94110ed04c1a49b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // ── Auth ──────────────────────────────────────────────────
+    let currentUser = null;
+
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      const signInBtn  = document.getElementById('sign-in-btn');
+      const userInfo   = document.getElementById('user-info');
+      const userName   = document.getElementById('user-name');
+      const userPhoto  = document.getElementById('user-photo');
+      const notice     = document.getElementById('guest-notice');
+
+      if (user) {
+        signInBtn.style.display = 'none';
+        userInfo.style.display  = 'flex';
+        userName.textContent    = user.displayName || 'Player';
+        userPhoto.src           = user.photoURL || '';
+        notice.textContent      = '';
+      } else {
+        signInBtn.style.display = 'block';
+        userInfo.style.display  = 'none';
+        notice.textContent      = 'Sign in with Google to appear on the leaderboard';
+      }
+    });
+
+    function signIn() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(err => console.error(err));
+    }
+
+    function signOut() {
+      auth.signOut();
+    }
+
+    // ── Difficulty ────────────────────────────────────────────
     const DIFFICULTY = {
       easy:   { minDelay: 2000, maxDelay: 4000, window: null },
       normal: { minDelay: 1500, maxDelay: 4500, window: null },
@@ -167,26 +276,26 @@
     };
 
     let difficulty = 'normal';
-    let waiting = false;
-    let ready = false;
-    let running = false;
-    let startTime = 0;
-    let streak = 0;
-    let sessionTimes = [];
-    let timeout, nextRoundTimeout, windowTimeout;
-
-    const game      = document.getElementById("game");
-    const gameText  = document.getElementById("game-text");
-    const gameSub   = document.getElementById("game-sub");
-    const scoresList = document.getElementById("scores");
-    const statsEl   = document.getElementById("stats");
 
     function setDifficulty(d) {
       difficulty = d;
-      document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('diff-' + d) || document.querySelector(`.diff-btn:nth-child(${['easy','normal','hard'].indexOf(d)+1})`);
-      document.querySelectorAll('.diff-btn')[['easy','normal','hard'].indexOf(d)].classList.add('active');
+      document.querySelectorAll('.diff-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['easy','normal','hard'][i] === d);
+      });
     }
+
+    setDifficulty('normal');
+
+    // ── Game state ────────────────────────────────────────────
+    let waiting = false, ready = false, running = false;
+    let startTime = 0, streak = 0;
+    let sessionTimes = [];
+    let timeout, nextRoundTimeout, windowTimeout;
+
+    const game     = document.getElementById('game');
+    const gameText = document.getElementById('game-text');
+    const gameSub  = document.getElementById('game-sub');
+    const statsEl  = document.getElementById('stats');
 
     function startGame() {
       running = true;
@@ -196,12 +305,24 @@
       nextRound();
     }
 
+    function stopGame() {
+      running = false;
+      waiting = false;
+      ready = false;
+      clearTimeout(timeout);
+      clearTimeout(nextRoundTimeout);
+      clearTimeout(windowTimeout);
+      game.style.background = '#333';
+      gameText.textContent = 'Press Start';
+      gameSub.textContent = '';
+    }
+
     function nextRound() {
       clearTimeout(nextRoundTimeout);
       clearTimeout(windowTimeout);
-      game.style.background = "#b22222";
-      gameText.textContent = "Wait...";
-      gameSub.textContent = "";
+      game.style.background = '#b22222';
+      gameText.textContent = 'Wait...';
+      gameSub.textContent = '';
       waiting = true;
       ready = false;
 
@@ -210,9 +331,9 @@
 
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        game.style.background = "#00aa44";
-        gameText.textContent = "TAP!";
-        gameSub.textContent = difficulty === 'hard' ? "Quick!" : "";
+        game.style.background = '#00aa44';
+        gameText.textContent = 'TAP!';
+        gameSub.textContent = difficulty === 'hard' ? 'Quick!' : '';
         startTime = Date.now();
         ready = true;
 
@@ -222,9 +343,9 @@
               ready = false;
               waiting = false;
               streak = 0;
-              game.style.background = "#555";
-              gameText.textContent = "Too slow!";
-              gameSub.textContent = "";
+              game.style.background = '#555';
+              gameText.textContent = 'Too slow!';
+              gameSub.textContent = '';
               updateStats();
               if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
             }
@@ -233,6 +354,50 @@
       }, delay);
     }
 
+    game.onclick = function () {
+      if (waiting && !ready) {
+        clearTimeout(timeout);
+        streak = 0;
+        game.style.background = '#333';
+        gameText.textContent = 'Too early!';
+        gameSub.textContent = '';
+        waiting = false;
+        updateStats();
+        if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
+        return;
+      }
+
+      if (ready) {
+        clearTimeout(windowTimeout);
+        const reaction = Date.now() - startTime;
+
+        game.classList.remove('flash');
+        void game.offsetWidth;
+        game.classList.add('flash');
+        playTapSound();
+
+        game.style.background = '#333';
+        gameText.textContent = reaction + ' ms';
+
+        sessionTimes.push(reaction);
+        streak++;
+
+        const sessionBest = Math.min(...sessionTimes);
+        if (sessionTimes.length === 1 || reaction === sessionBest) {
+          gameSub.textContent = sessionTimes.length > 1 ? 'New session best!' : '';
+        } else {
+          gameSub.textContent = streak >= 3 ? 'Streak: ' + streak : '';
+        }
+
+        saveScore(reaction);
+        waiting = false;
+        ready = false;
+        updateStats();
+        if (running) nextRoundTimeout = setTimeout(nextRound, 1400);
+      }
+    };
+
+    // ── Sound ─────────────────────────────────────────────────
     function playTapSound() {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -249,114 +414,68 @@
       } catch(e) {}
     }
 
-    game.onclick = function () {
-      if (waiting && !ready) {
-        clearTimeout(timeout);
-        streak = 0;
-        game.style.background = "#333";
-        gameText.textContent = "Too early!";
-        gameSub.textContent = "";
-        waiting = false;
-        updateStats();
-        if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
-        return;
-      }
-
-      if (ready) {
-        clearTimeout(windowTimeout);
-        const reaction = Date.now() - startTime;
-
-        game.classList.remove('flash');
-        void game.offsetWidth;
-        game.classList.add('flash');
-        playTapSound();
-
-        game.style.background = "#333";
-        gameText.textContent = reaction + " ms";
-
-        sessionTimes.push(reaction);
-        streak++;
-
-        const pb = getPersonalBest();
-        if (pb === null || reaction < pb) {
-          gameSub.textContent = "New best!";
-        } else {
-          gameSub.textContent = streak > 1 ? "Streak: " + streak : "";
-        }
-
-        saveScore(reaction);
-        waiting = false;
-        ready = false;
-        updateStats();
-        if (running) nextRoundTimeout = setTimeout(nextRound, 1400);
-      }
-    };
-
-    function getPersonalBest() {
-      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
-      const name = document.getElementById("name").value.trim() || "Player";
-      const mine = scores.filter(s => s.name === name).map(s => s.time);
-      return mine.length ? Math.min(...mine) : null;
-    }
-
+    // ── Stats ─────────────────────────────────────────────────
     function updateStats() {
-      if (sessionTimes.length === 0) {
-        statsEl.textContent = "";
-        return;
-      }
-      const avg = Math.round(sessionTimes.reduce((a, b) => a + b, 0) / sessionTimes.length);
+      if (!sessionTimes.length) { statsEl.textContent = ''; return; }
+      const avg  = Math.round(sessionTimes.reduce((a,b) => a+b, 0) / sessionTimes.length);
       const best = Math.min(...sessionTimes);
-      let html = "Avg: " + avg + " ms &nbsp;|&nbsp; Best: " + best + " ms";
-      if (streak >= 3) html += " &nbsp;<span class='streak-badge'>🔥 " + streak + "</span>";
+      let html = 'Avg: ' + avg + ' ms &nbsp;|&nbsp; Best: ' + best + ' ms';
+      if (streak >= 3) html += " &nbsp;<span class='streak-badge'>🔥 " + streak + '</span>';
       statsEl.innerHTML = html;
     }
 
-    function saveScore(time) {
-      let name = document.getElementById("name").value.trim();
-      if (name === "") name = "Player";
+    // ── Firestore leaderboard ─────────────────────────────────
+    // One document per user (uid = doc ID), always keeping their best score.
+    async function saveScore(time) {
+      if (!currentUser) return;
 
-      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
-      scores.push({ name: name, time: time });
-      scores.sort((a, b) => a.time - b.time);
-      scores = scores.slice(0, 10);
+      const ref = db.collection('scores').doc(currentUser.uid);
+      const doc = await ref.get();
 
-      localStorage.setItem("scores", JSON.stringify(scores));
-      showScores();
+      if (!doc.exists || time < doc.data().time) {
+        await ref.set({
+          uid:      currentUser.uid,
+          name:     currentUser.displayName || 'Player',
+          photoURL: currentUser.photoURL    || '',
+          time:     time,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
     }
 
-    function showScores() {
-      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
-      scoresList.innerHTML = "";
+    // Real-time listener — top 10 all-time
+    db.collection('scores')
+      .orderBy('time')
+      .limit(10)
+      .onSnapshot(snapshot => {
+        const scoresList = document.getElementById('scores');
+        scoresList.innerHTML = '';
 
-      scores.forEach((score, i) => {
-        const li = document.createElement("li");
-        li.textContent = (i + 1) + ". " + score.name + " — " + score.time + " ms";
-        if (i === 0) li.classList.add("best");
-        scoresList.appendChild(li);
-      });
+        if (snapshot.empty) {
+          scoresList.innerHTML = '<li id="lb-empty">No scores yet — be the first!</li>';
+          return;
+        }
+
+        snapshot.docs.forEach((doc, i) => {
+          const s  = doc.data();
+          const li = document.createElement('li');
+          if (i === 0) li.classList.add('best');
+
+          const isMe = currentUser && doc.id === currentUser.uid;
+
+          li.innerHTML =
+            '<span class="rank">' + (i + 1) + '.</span>' +
+            (s.photoURL ? '<img src="' + s.photoURL + '" alt="">' : '') +
+            '<span class="lname">' + escHtml(s.name) + (isMe ? ' <span style="color:#4af;font-size:12px">(you)</span>' : '') + '</span>' +
+            '<span class="ltime">' + s.time + ' ms</span>';
+
+          scoresList.appendChild(li);
+        });
+      }, err => console.error('Leaderboard error:', err));
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    function resetScores() {
-      running = false;
-      waiting = false;
-      ready = false;
-      streak = 0;
-      sessionTimes = [];
-      clearTimeout(timeout);
-      clearTimeout(nextRoundTimeout);
-      clearTimeout(windowTimeout);
-      game.style.background = "#333";
-      gameText.textContent = "Press Start";
-      gameSub.textContent = "";
-      statsEl.textContent = "";
-
-      localStorage.removeItem("scores");
-      showScores();
-    }
-
-    // init difficulty buttons
-    setDifficulty('normal');
-    showScores();
   </script>
 
 </body>
