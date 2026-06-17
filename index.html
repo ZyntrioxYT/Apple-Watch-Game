@@ -5,188 +5,434 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Reaction">
-  <meta name="theme-color" content="#111111">
+  <meta name="theme-color" content="#0a0a0f">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Reaction Game</title>
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #111;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      background: #0a0a0f;
       color: white;
       text-align: center;
       user-select: none;
+      min-height: 100dvh;
+      overflow-x: hidden;
     }
+
+    /* Ambient background glow */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -30%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0,200,100,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      transition: background 0.8s ease;
+    }
+
+    body.state-wait::before  { background: radial-gradient(circle, rgba(220,50,50,0.1) 0%, transparent 70%); }
+    body.state-go::before    { background: radial-gradient(circle, rgba(0,220,100,0.15) 0%, transparent 70%); }
 
     /* ── Auth bar ── */
     #auth-bar {
+      position: relative;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding: 10px 16px;
+      padding: 14px 20px;
       gap: 10px;
-      min-height: 52px;
     }
 
     #auth-bar img {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.2);
     }
 
     #auth-bar span {
-      font-size: 14px;
-      color: #ccc;
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
     }
 
     .auth-btn {
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 600;
       padding: 7px 14px;
       border: none;
-      border-radius: 10px;
+      border-radius: 20px;
       cursor: pointer;
-      font-weight: bold;
+      letter-spacing: 0.01em;
+      transition: opacity 0.15s;
     }
 
-    #sign-in-btn  { background: white; color: #333; }
-    #sign-out-btn { background: #333;  color: #aaa; }
+    .auth-btn:active { opacity: 0.7; }
+
+    #sign-in-btn {
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+    }
+
+    #sign-out-btn {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.4);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* ── Main container ── */
+    #main {
+      position: relative;
+      z-index: 1;
+      padding: 0 20px 40px;
+      max-width: 420px;
+      margin: 0 auto;
+    }
 
     /* ── Title ── */
-    h1 { font-size: 26px; margin: 0 0 8px; }
+    .title-row {
+      margin-bottom: 24px;
+    }
 
-    /* ── Difficulty ── */
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: white;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: rgba(255,255,255,0.35);
+      margin-top: 2px;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Difficulty pills ── */
     #difficulty-row {
       display: flex;
       justify-content: center;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 4px;
     }
 
     .diff-btn {
-      font-size: 14px;
-      padding: 6px 14px;
-      border: 2px solid #555;
-      border-radius: 12px;
-      background: #222;
-      color: #aaa;
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 0;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: rgba(255,255,255,0.4);
       cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.01em;
     }
 
     .diff-btn.active {
-      border-color: #00aa44;
+      background: rgba(255,255,255,0.1);
       color: white;
-      background: #1a3a27;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     /* ── Game box ── */
     #game {
-      margin: 0 auto 6px;
-      width: 90vw;
-      max-width: 350px;
-      height: 230px;
-      border-radius: 25px;
-      background: #333;
+      width: 100%;
+      aspect-ratio: 1 / 0.75;
+      border-radius: 28px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 26px;
-      padding: 10px;
-      transition: background 0.1s;
+      font-size: 28px;
+      font-weight: 700;
+      padding: 20px;
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      margin-bottom: 14px;
+      backdrop-filter: blur(20px);
     }
 
-    #game.flash { animation: flash 0.25s ease-out; }
+    #game.state-idle {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.08);
+    }
+
+    #game.state-wait {
+      background: rgba(200, 40, 40, 0.25);
+      border-color: rgba(220, 60, 60, 0.4);
+      box-shadow: 0 0 40px rgba(200,40,40,0.2);
+      animation: pulse-wait 1.5s ease-in-out infinite;
+    }
+
+    #game.state-go {
+      background: rgba(0, 190, 80, 0.28);
+      border-color: rgba(0, 220, 90, 0.5);
+      box-shadow: 0 0 60px rgba(0,200,80,0.3);
+      animation: pulse-go 0.6s ease-in-out infinite;
+    }
+
+    #game.state-result {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    @keyframes pulse-wait {
+      0%, 100% { box-shadow: 0 0 30px rgba(200,40,40,0.15); }
+      50%       { box-shadow: 0 0 55px rgba(200,40,40,0.3); }
+    }
+
+    @keyframes pulse-go {
+      0%, 100% { box-shadow: 0 0 40px rgba(0,200,80,0.25); transform: scale(1); }
+      50%       { box-shadow: 0 0 70px rgba(0,200,80,0.45); transform: scale(1.005); }
+    }
+
+    #game.flash { animation: flash 0.2s ease-out forwards !important; }
 
     @keyframes flash {
-      0%   { filter: brightness(2); }
+      0%   { filter: brightness(1.8); }
       100% { filter: brightness(1); }
     }
 
-    #game-sub {
-      font-size: 15px;
-      opacity: 0.75;
-      margin-top: 6px;
-      min-height: 20px;
+    #game-text {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
     }
 
-    /* ── Stats ── */
+    #game-sub {
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.5);
+      margin-top: 8px;
+      min-height: 18px;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Stats bar ── */
     #stats {
-      font-size: 15px;
-      color: #aaa;
-      margin: 4px 0 6px;
-      min-height: 20px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 16px;
+      min-height: 18px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
     }
 
     .streak-badge {
       display: inline-block;
-      background: #e65c00;
+      background: linear-gradient(135deg, #ff6b00, #ff3d00);
       color: white;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 700;
       border-radius: 8px;
       padding: 2px 8px;
       margin-left: 6px;
     }
 
-    /* ── Buttons ── */
+    /* ── Action buttons ── */
+    #btn-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
     .game-btn {
-      font-size: 24px;
-      padding: 18px 25px;
+      flex: 1;
+      font-size: 17px;
+      font-weight: 600;
+      padding: 16px;
       border: none;
       border-radius: 18px;
-      margin: 6px;
       cursor: pointer;
+      transition: transform 0.1s, opacity 0.1s;
+      letter-spacing: 0.01em;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .game-btn:active { transform: scale(0.97); opacity: 0.85; }
+
+    #start-btn {
+      background: linear-gradient(135deg, #00c853, #00a844);
+      color: white;
+      box-shadow: 0 4px 20px rgba(0,200,80,0.3);
+    }
+
+    #stop-btn {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
     }
 
     /* ── Guest notice ── */
     #guest-notice {
-      font-size: 13px;
-      color: #888;
-      margin: 6px 0 2px;
-      min-height: 18px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      margin: 8px 0 4px;
+      min-height: 16px;
     }
 
     /* ── Leaderboard ── */
-    #leaderboard { font-size: 18px; margin-top: 10px; padding-bottom: 30px; }
-
-    #leaderboard ol {
-      padding: 0;
-      list-style: none;
-      margin: 0 auto;
-      max-width: 350px;
+    #leaderboard {
+      margin-top: 28px;
     }
 
-    #leaderboard li {
+    .lb-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 5px 10px;
-      border-radius: 10px;
+      justify-content: space-between;
+      margin-bottom: 14px;
     }
 
-    #leaderboard li.best { background: #2a2500; }
+    .lb-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
 
-    #leaderboard li img {
-      width: 24px;
-      height: 24px;
+    .lb-header .lb-live {
+      font-size: 11px;
+      font-weight: 600;
+      color: #00c853;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .lb-live-dot {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
+      background: #00c853;
+      animation: blink 1.5s ease-in-out infinite;
     }
 
-    #leaderboard li .rank { color: #888; width: 22px; text-align: right; flex-shrink: 0; }
-    #leaderboard li.best .rank { color: gold; }
-    #leaderboard li .lname { flex: 1; text-align: left; }
-    #leaderboard li.best .lname { color: gold; font-weight: bold; }
-    #leaderboard li .ltime { color: #aaa; font-size: 15px; }
-    #leaderboard li.best .ltime { color: gold; }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
 
-    #lb-empty { color: #555; font-size: 15px; margin-top: 10px; }
+    #scores {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #scores li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: background 0.2s;
+    }
+
+    #scores li.best {
+      background: rgba(255,196,0,0.08);
+      border-color: rgba(255,196,0,0.2);
+    }
+
+    #scores li.is-me {
+      background: rgba(0,150,255,0.08);
+      border-color: rgba(0,150,255,0.2);
+    }
+
+    #scores li img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.1);
+    }
+
+    .rank {
+      font-size: 13px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.3);
+      width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    li.best .rank { color: #ffd700; }
+
+    .lname {
+      flex: 1;
+      text-align: left;
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    li.best .lname { color: #ffd700; }
+    li.is-me .lname { color: #4db8ff; }
+
+    .you-tag {
+      font-size: 10px;
+      font-weight: 700;
+      color: #4db8ff;
+      background: rgba(0,150,255,0.15);
+      border-radius: 5px;
+      padding: 1px 5px;
+      margin-left: 5px;
+      vertical-align: middle;
+      letter-spacing: 0.05em;
+    }
+
+    .ltime {
+      font-size: 14px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.45);
+      font-variant-numeric: tabular-nums;
+    }
+
+    li.best .ltime { color: #ffd700; }
+    li.is-me .ltime { color: #4db8ff; }
+
+    #lb-empty {
+      color: rgba(255,255,255,0.25);
+      font-size: 14px;
+      padding: 20px;
+      background: none !important;
+      border: none !important;
+      justify-content: center;
+    }
+
+    .avatar-placeholder {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
   </style>
 </head>
-<body>
+<body class="state-idle">
 
-  <!-- Auth bar -->
   <div id="auth-bar">
     <div id="user-info" style="display:none; align-items:center; gap:8px;">
       <img id="user-photo" src="" alt="">
@@ -196,29 +442,41 @@
     <button class="auth-btn" id="sign-in-btn" onclick="signIn()">Sign in with Google</button>
   </div>
 
-  <h1>Reaction Time</h1>
+  <div id="main">
 
-  <div id="difficulty-row">
-    <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
-    <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
-    <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
-  </div>
+    <div class="title-row">
+      <h1>Reaction Time</h1>
+      <div class="subtitle">How fast are you?</div>
+    </div>
 
-  <div id="game">
-    <span id="game-text">Press Start</span>
-    <span id="game-sub"></span>
-  </div>
+    <div id="difficulty-row">
+      <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
+      <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
+      <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
+    </div>
 
-  <div id="stats"></div>
+    <div id="game" class="state-idle" onclick="handleTap()">
+      <span id="game-text">Tap Start</span>
+      <span id="game-sub"></span>
+    </div>
 
-  <button class="game-btn" onclick="startGame()">Start</button>
-  <button class="game-btn" onclick="stopGame()">Stop</button>
+    <div id="stats"></div>
 
-  <div id="guest-notice"></div>
+    <div id="btn-row">
+      <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
+      <button class="game-btn" id="stop-btn" onclick="stopGame()">Stop</button>
+    </div>
 
-  <div id="leaderboard">
-    <h2>Global Leaderboard</h2>
-    <ol id="scores"><li id="lb-empty">Loading...</li></ol>
+    <div id="guest-notice"></div>
+
+    <div id="leaderboard">
+      <div class="lb-header">
+        <h2>Global Leaderboard</h2>
+        <div class="lb-live"><span class="lb-live-dot"></span> Live</div>
+      </div>
+      <ol id="scores"><li id="lb-empty">Loading...</li></ol>
+    </div>
+
   </div>
 
   <!-- Firebase SDKs -->
@@ -227,7 +485,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <script>
-    // ── Firebase init ──────────────────────────────────────────
     const firebaseConfig = {
       apiKey: "AIzaSyDDnBWZOwrPxCJcOPsAajx0cMmbyHTf6dY",
       authDomain: "apple-watch-game.firebaseapp.com",
@@ -246,33 +503,28 @@
 
     auth.onAuthStateChanged(user => {
       currentUser = user;
-      const signInBtn  = document.getElementById('sign-in-btn');
-      const userInfo   = document.getElementById('user-info');
-      const userName   = document.getElementById('user-name');
-      const userPhoto  = document.getElementById('user-photo');
-      const notice     = document.getElementById('guest-notice');
+      const signInBtn = document.getElementById('sign-in-btn');
+      const userInfo  = document.getElementById('user-info');
+      const notice    = document.getElementById('guest-notice');
 
       if (user) {
         signInBtn.style.display = 'none';
         userInfo.style.display  = 'flex';
-        userName.textContent    = user.displayName || 'Player';
-        userPhoto.src           = user.photoURL || '';
-        notice.textContent      = '';
+        document.getElementById('user-name').textContent = user.displayName || 'Player';
+        document.getElementById('user-photo').src        = user.photoURL || '';
+        notice.textContent = '';
       } else {
         signInBtn.style.display = 'block';
         userInfo.style.display  = 'none';
-        notice.textContent      = 'Sign in with Google to appear on the leaderboard';
+        notice.textContent = 'Sign in with Google to appear on the leaderboard';
       }
     });
 
     function signIn() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).catch(err => console.error(err));
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
     }
 
-    function signOut() {
-      auth.signOut();
-    }
+    function signOut() { auth.signOut(); }
 
     // ── Difficulty ────────────────────────────────────────────
     const DIFFICULTY = {
@@ -298,10 +550,15 @@
     let sessionTimes = [];
     let timeout, nextRoundTimeout, windowTimeout;
 
-    const game     = document.getElementById('game');
+    const gameEl   = document.getElementById('game');
     const gameText = document.getElementById('game-text');
     const gameSub  = document.getElementById('game-sub');
     const statsEl  = document.getElementById('stats');
+
+    function setGameState(state) {
+      gameEl.className = 'state-' + state;
+      document.body.className = 'state-' + state;
+    }
 
     function startGame() {
       running = true;
@@ -318,17 +575,17 @@
       clearTimeout(timeout);
       clearTimeout(nextRoundTimeout);
       clearTimeout(windowTimeout);
-      game.style.background = '#333';
-      gameText.textContent = 'Press Start';
-      gameSub.textContent = '';
+      setGameState('idle');
+      gameText.textContent = 'Tap Start';
+      gameSub.textContent  = '';
     }
 
     function nextRound() {
       clearTimeout(nextRoundTimeout);
       clearTimeout(windowTimeout);
-      game.style.background = '#b22222';
+      setGameState('wait');
       gameText.textContent = 'Wait...';
-      gameSub.textContent = '';
+      gameSub.textContent  = '';
       waiting = true;
       ready = false;
 
@@ -337,9 +594,9 @@
 
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        game.style.background = '#00aa44';
+        setGameState('go');
         gameText.textContent = 'TAP!';
-        gameSub.textContent = difficulty === 'hard' ? 'Quick!' : '';
+        gameSub.textContent  = difficulty === 'hard' ? 'Be quick!' : '';
         startTime = Date.now();
         ready = true;
 
@@ -349,27 +606,27 @@
               ready = false;
               waiting = false;
               streak = 0;
-              game.style.background = '#555';
+              setGameState('result');
               gameText.textContent = 'Too slow!';
-              gameSub.textContent = '';
+              gameSub.textContent  = '';
               updateStats();
-              if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
+              if (running) nextRoundTimeout = setTimeout(nextRound, 1300);
             }
           }, cfg.window);
         }
       }, delay);
     }
 
-    game.onclick = function () {
+    function handleTap() {
       if (waiting && !ready) {
         clearTimeout(timeout);
         streak = 0;
-        game.style.background = '#333';
+        setGameState('result');
         gameText.textContent = 'Too early!';
-        gameSub.textContent = '';
+        gameSub.textContent  = '';
         waiting = false;
         updateStats();
-        if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
+        if (running) nextRoundTimeout = setTimeout(nextRound, 1300);
         return;
       }
 
@@ -377,22 +634,24 @@
         clearTimeout(windowTimeout);
         const reaction = Date.now() - startTime;
 
-        game.classList.remove('flash');
-        void game.offsetWidth;
-        game.classList.add('flash');
+        gameEl.classList.remove('flash');
+        void gameEl.offsetWidth;
+        gameEl.classList.add('flash');
         playTapSound();
 
-        game.style.background = '#333';
+        setGameState('result');
         gameText.textContent = reaction + ' ms';
 
         sessionTimes.push(reaction);
         streak++;
 
         const sessionBest = Math.min(...sessionTimes);
-        if (sessionTimes.length === 1 || reaction === sessionBest) {
-          gameSub.textContent = sessionTimes.length > 1 ? 'New session best!' : '';
+        if (sessionTimes.length > 1 && reaction === sessionBest) {
+          gameSub.textContent = 'New session best!';
+        } else if (streak >= 3) {
+          gameSub.textContent = 'Streak: ' + streak;
         } else {
-          gameSub.textContent = streak >= 3 ? 'Streak: ' + streak : '';
+          gameSub.textContent = '';
         }
 
         saveScore(reaction);
@@ -401,43 +660,40 @@
         updateStats();
         if (running) nextRoundTimeout = setTimeout(nextRound, 1400);
       }
-    };
+    }
 
     // ── Sound ─────────────────────────────────────────────────
     function playTapSound() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
+        const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+        const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(900, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(450, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
         osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.15);
+        osc.stop(ctx.currentTime + 0.18);
       } catch(e) {}
     }
 
     // ── Stats ─────────────────────────────────────────────────
     function updateStats() {
       if (!sessionTimes.length) { statsEl.textContent = ''; return; }
-      const avg  = Math.round(sessionTimes.reduce((a,b) => a+b, 0) / sessionTimes.length);
+      const avg  = Math.round(sessionTimes.reduce((a,b) => a+b,0) / sessionTimes.length);
       const best = Math.min(...sessionTimes);
-      let html = 'Avg: ' + avg + ' ms &nbsp;|&nbsp; Best: ' + best + ' ms';
+      let html = 'Avg: <b>' + avg + ' ms</b> &nbsp;·&nbsp; Best: <b>' + best + ' ms</b>';
       if (streak >= 3) html += " &nbsp;<span class='streak-badge'>🔥 " + streak + '</span>';
       statsEl.innerHTML = html;
     }
 
-    // ── Firestore leaderboard ─────────────────────────────────
-    // One document per user (uid = doc ID), always keeping their best score.
+    // ── Firestore ─────────────────────────────────────────────
     async function saveScore(time) {
       if (!currentUser) return;
-
       const ref = db.collection('scores').doc(currentUser.uid);
       const doc = await ref.get();
-
       if (!doc.exists || time < doc.data().time) {
         await ref.set({
           uid:      currentUser.uid,
@@ -449,38 +705,41 @@
       }
     }
 
-    // Real-time listener — top 10 all-time
-    db.collection('scores')
-      .orderBy('time')
-      .limit(10)
-      .onSnapshot(snapshot => {
-        const scoresList = document.getElementById('scores');
-        scoresList.innerHTML = '';
+    db.collection('scores').orderBy('time').limit(10).onSnapshot(snapshot => {
+      const list = document.getElementById('scores');
+      list.innerHTML = '';
 
-        if (snapshot.empty) {
-          scoresList.innerHTML = '<li id="lb-empty">No scores yet — be the first!</li>';
-          return;
-        }
+      if (snapshot.empty) {
+        list.innerHTML = '<li id="lb-empty">No scores yet — be the first!</li>';
+        return;
+      }
 
-        snapshot.docs.forEach((doc, i) => {
-          const s  = doc.data();
-          const li = document.createElement('li');
-          if (i === 0) li.classList.add('best');
+      snapshot.docs.forEach((doc, i) => {
+        const s    = doc.data();
+        const li   = document.createElement('li');
+        const isMe = currentUser && doc.id === currentUser.uid;
 
-          const isMe = currentUser && doc.id === currentUser.uid;
+        if (i === 0) li.classList.add('best');
+        if (isMe)    li.classList.add('is-me');
 
-          li.innerHTML =
-            '<span class="rank">' + (i + 1) + '.</span>' +
-            (s.photoURL ? '<img src="' + s.photoURL + '" alt="">' : '') +
-            '<span class="lname">' + escHtml(s.name) + (isMe ? ' <span style="color:#4af;font-size:12px">(you)</span>' : '') + '</span>' +
-            '<span class="ltime">' + s.time + ' ms</span>';
+        const avatar = s.photoURL
+          ? '<img src="' + s.photoURL + '" alt="" referrerpolicy="no-referrer">'
+          : '<div class="avatar-placeholder"></div>';
 
-          scoresList.appendChild(li);
-        });
-      }, err => console.error('Leaderboard error:', err));
+        const youTag = isMe ? '<span class="you-tag">YOU</span>' : '';
+
+        li.innerHTML =
+          '<span class="rank">' + (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1)) + '</span>' +
+          avatar +
+          '<span class="lname">' + escHtml(s.name) + youTag + '</span>' +
+          '<span class="ltime">' + s.time + ' ms</span>';
+
+        list.appendChild(li);
+      });
+    }, err => console.error('Leaderboard error:', err));
 
     function escHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
   </script>
 
