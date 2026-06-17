@@ -2,31 +2,153 @@
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Watch Tap Game</title>
+  <title>Reaction Game</title>
   <style>
     body {
-      font-family: Arial;
-      text-align: center;
-      background: black;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
       color: white;
+      text-align: center;
+      user-select: none;
     }
+
+    h1 {
+      font-size: 26px;
+      margin: 15px 0 5px;
+    }
+
+    #game {
+      margin: 10px auto;
+      width: 90vw;
+      max-width: 350px;
+      height: 230px;
+      border-radius: 25px;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
     button {
-      font-size: 28px;
-      padding: 25px;
-      border-radius: 20px;
-      margin-top: 30px;
+      font-size: 24px;
+      padding: 18px 25px;
+      border: none;
+      border-radius: 18px;
+      margin: 8px;
+    }
+
+    #leaderboard {
+      font-size: 18px;
+      margin-top: 10px;
+    }
+
+    input {
+      font-size: 20px;
+      width: 130px;
+      text-align: center;
+      border-radius: 12px;
+      border: none;
+      padding: 8px;
     }
   </style>
 </head>
 <body>
-  <h2>Tap Game</h2>
-  <p>Score: <span id="score">0</span></p>
-  <button onclick="score++ ; document.getElementById('score').textContent = score;">
-    TAP!
-  </button>
+
+  <h1>Reaction Time</h1>
+
+  <input id="name" placeholder="Name" maxlength="8">
+
+  <div id="game">Press Start</div>
+
+  <button onclick="startGame()">Start</button>
+  <button onclick="resetScores()">Reset</button>
+
+  <div id="leaderboard">
+    <h2>Leaderboard</h2>
+    <ol id="scores"></ol>
+  </div>
 
   <script>
-    let score = 0;
+    let waiting = false;
+    let ready = false;
+    let startTime = 0;
+    let timeout;
+
+    const game = document.getElementById("game");
+    const scoresList = document.getElementById("scores");
+
+    function startGame() {
+      game.style.background = "#b22222";
+      game.textContent = "Wait...";
+      waiting = true;
+      ready = false;
+
+      const delay = Math.random() * 3000 + 1500;
+
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        game.style.background = "#00aa44";
+        game.textContent = "TAP!";
+        startTime = Date.now();
+        ready = true;
+      }, delay);
+    }
+
+    game.onclick = function () {
+      if (waiting && !ready) {
+        clearTimeout(timeout);
+        game.style.background = "#333";
+        game.textContent = "Too early!";
+        waiting = false;
+        return;
+      }
+
+      if (ready) {
+        const reaction = Date.now() - startTime;
+        game.style.background = "#333";
+        game.textContent = reaction + " ms";
+
+        saveScore(reaction);
+        waiting = false;
+        ready = false;
+      }
+    };
+
+    function saveScore(time) {
+      let name = document.getElementById("name").value.trim();
+      if (name === "") name = "Player";
+
+      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      scores.push({ name: name, time: time });
+      scores.sort((a, b) => a.time - b.time);
+      scores = scores.slice(0, 5);
+
+      localStorage.setItem("scores", JSON.stringify(scores));
+      showScores();
+    }
+
+    function showScores() {
+      let scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      scoresList.innerHTML = "";
+
+      scores.forEach(score => {
+        const li = document.createElement("li");
+        li.textContent = score.name + " - " + score.time + " ms";
+        scoresList.appendChild(li);
+      });
+    }
+
+    function resetScores() {
+      localStorage.removeItem("scores");
+      showScores();
+    }
+
+    showScores();
   </script>
+
 </body>
 </html>
