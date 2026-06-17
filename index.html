@@ -75,13 +75,21 @@
   <script>
     let waiting = false;
     let ready = false;
+    let running = false;
     let startTime = 0;
     let timeout;
+    let nextRoundTimeout;
 
     const game = document.getElementById("game");
     const scoresList = document.getElementById("scores");
 
     function startGame() {
+      running = true;
+      nextRound();
+    }
+
+    function nextRound() {
+      clearTimeout(nextRoundTimeout);
       game.style.background = "#b22222";
       game.textContent = "Wait...";
       waiting = true;
@@ -104,6 +112,7 @@
         game.style.background = "#333";
         game.textContent = "Too early!";
         waiting = false;
+        if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
         return;
       }
 
@@ -115,6 +124,7 @@
         saveScore(reaction);
         waiting = false;
         ready = false;
+        if (running) nextRoundTimeout = setTimeout(nextRound, 1200);
       }
     };
 
@@ -143,6 +153,14 @@
     }
 
     function resetScores() {
+      running = false;
+      waiting = false;
+      ready = false;
+      clearTimeout(timeout);
+      clearTimeout(nextRoundTimeout);
+      game.style.background = "#333";
+      game.textContent = "Press Start";
+
       localStorage.removeItem("scores");
       showScores();
     }
