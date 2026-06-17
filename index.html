@@ -840,8 +840,7 @@
 
     function scheduleBotTap() {
       if (!botMode || !ready) return;
-      // Realistic human reaction: 180–320ms with slight variance
-      const delay = 180 + Math.random() * 140 + (Math.random() < 0.1 ? 80 : 0);
+      const delay = 0;
       botTapTimeout = setTimeout(() => { if (ready && botMode) handleTap(); }, delay);
     }
 
