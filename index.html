@@ -794,10 +794,15 @@
       return map[code] || 'Something went wrong. Please try again.';
     }
 
-    // Allow Enter key to submit
+    // Keyboard controls
     document.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && document.getElementById('auth-overlay').classList.contains('open')) {
-        submitAuth();
+      if (document.getElementById('auth-overlay').classList.contains('open')) {
+        if (e.key === 'Enter') submitAuth();
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleTap();
       }
     });
 
