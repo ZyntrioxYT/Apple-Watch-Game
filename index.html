@@ -429,6 +429,168 @@
       background: rgba(255,255,255,0.08);
       flex-shrink: 0;
     }
+
+    /* ── Auth modal ── */
+    #auth-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    #auth-overlay.open { display: flex; }
+
+    #auth-modal {
+      background: #18181f;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px 28px 0 0;
+      padding: 28px 24px 40px;
+      width: 100%;
+      max-width: 480px;
+      animation: slide-up 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes slide-up {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    #auth-modal h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    #auth-modal .auth-tabs {
+      display: flex;
+      gap: 0;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 3px;
+      margin: 16px 0;
+    }
+
+    .auth-tab {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .auth-tab.active {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    .auth-field {
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      color: white;
+      font-size: 16px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .auth-field:focus { border-color: rgba(0,200,80,0.5); }
+    .auth-field::placeholder { color: rgba(255,255,255,0.25); }
+
+    #auth-error {
+      font-size: 13px;
+      color: #ff5555;
+      min-height: 18px;
+      margin-bottom: 8px;
+      text-align: left;
+    }
+
+    .auth-submit {
+      width: 100%;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 15px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #00c853, #00a844);
+      color: white;
+      cursor: pointer;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 20px rgba(0,200,80,0.3);
+      transition: opacity 0.15s;
+      font-family: inherit;
+    }
+
+    .auth-submit:active { opacity: 0.8; }
+
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.2);
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .google-btn {
+      width: 100%;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.06);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+
+    .google-btn:active { background: rgba(255,255,255,0.1); }
+
+    .google-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .auth-cancel {
+      width: 100%;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px;
+      border: none;
+      border-radius: 14px;
+      background: transparent;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+      font-family: inherit;
+    }
   </style>
 </head>
 <body class="state-idle">
@@ -439,7 +601,43 @@
       <span id="user-name"></span>
       <button class="auth-btn" id="sign-out-btn" onclick="signOut()">Sign out</button>
     </div>
-    <button class="auth-btn" id="sign-in-btn" onclick="signIn()">Sign in with Google</button>
+    <button class="auth-btn" id="sign-in-btn" onclick="openAuthModal()">Sign in</button>
+  </div>
+
+  <!-- Auth modal -->
+  <div id="auth-overlay" onclick="handleOverlayClick(event)">
+    <div id="auth-modal">
+      <h2 id="auth-title">Welcome back</h2>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-signin" onclick="switchTab('signin')">Sign in</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Create account</button>
+      </div>
+
+      <div id="signup-name-wrap" style="display:none">
+        <input class="auth-field" id="auth-display-name" type="text" placeholder="Display name" maxlength="20" autocomplete="username">
+      </div>
+      <input class="auth-field" id="auth-email" type="email" placeholder="Email" autocomplete="email">
+      <input class="auth-field" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+
+      <div id="auth-error"></div>
+
+      <button class="auth-submit" id="auth-submit-btn" onclick="submitAuth()">Sign in</button>
+
+      <div class="auth-divider">or</div>
+
+      <button class="google-btn" onclick="signInGoogle()">
+        <svg class="google-icon" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continue with Google
+      </button>
+
+      <button class="auth-cancel" onclick="closeAuthModal()">Cancel</button>
+    </div>
   </div>
 
   <div id="main">
@@ -510,21 +708,98 @@
       if (user) {
         signInBtn.style.display = 'none';
         userInfo.style.display  = 'flex';
-        document.getElementById('user-name').textContent = user.displayName || 'Player';
+        document.getElementById('user-name').textContent = user.displayName || user.email || 'Player';
         document.getElementById('user-photo').src        = user.photoURL || '';
         notice.textContent = '';
+        closeAuthModal();
       } else {
         signInBtn.style.display = 'block';
         userInfo.style.display  = 'none';
-        notice.textContent = 'Sign in with Google to appear on the leaderboard';
+        notice.textContent = 'Sign in to appear on the leaderboard';
       }
     });
 
-    function signIn() {
-      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
+    function signOut() { auth.signOut(); }
+
+    // ── Auth modal ────────────────────────────────────────────
+    let authMode = 'signin';
+
+    function openAuthModal() {
+      switchTab('signin');
+      document.getElementById('auth-error').textContent = '';
+      document.getElementById('auth-email').value = '';
+      document.getElementById('auth-password').value = '';
+      document.getElementById('auth-display-name').value = '';
+      document.getElementById('auth-overlay').classList.add('open');
     }
 
-    function signOut() { auth.signOut(); }
+    function closeAuthModal() {
+      document.getElementById('auth-overlay').classList.remove('open');
+    }
+
+    function handleOverlayClick(e) {
+      if (e.target === document.getElementById('auth-overlay')) closeAuthModal();
+    }
+
+    function switchTab(mode) {
+      authMode = mode;
+      document.getElementById('tab-signin').classList.toggle('active', mode === 'signin');
+      document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+      document.getElementById('auth-title').textContent = mode === 'signin' ? 'Welcome back' : 'Create account';
+      document.getElementById('auth-submit-btn').textContent = mode === 'signin' ? 'Sign in' : 'Create account';
+      document.getElementById('signup-name-wrap').style.display = mode === 'signup' ? 'block' : 'none';
+      document.getElementById('auth-password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+      document.getElementById('auth-error').textContent = '';
+    }
+
+    async function submitAuth() {
+      const email    = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const errorEl  = document.getElementById('auth-error');
+      errorEl.textContent = '';
+
+      if (!email || !password) { errorEl.textContent = 'Please fill in all fields.'; return; }
+
+      try {
+        if (authMode === 'signin') {
+          await auth.signInWithEmailAndPassword(email, password);
+        } else {
+          const displayName = document.getElementById('auth-display-name').value.trim() || email.split('@')[0];
+          if (!displayName) { errorEl.textContent = 'Please enter a display name.'; return; }
+          const cred = await auth.createUserWithEmailAndPassword(email, password);
+          await cred.user.updateProfile({ displayName });
+        }
+      } catch (err) {
+        errorEl.textContent = friendlyAuthError(err.code);
+      }
+    }
+
+    function signInGoogle() {
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+        document.getElementById('auth-error').textContent = friendlyAuthError(err.code);
+      });
+    }
+
+    function friendlyAuthError(code) {
+      const map = {
+        'auth/invalid-email':            'Invalid email address.',
+        'auth/user-not-found':           'No account found with that email.',
+        'auth/wrong-password':           'Incorrect password.',
+        'auth/invalid-credential':       'Incorrect email or password.',
+        'auth/email-already-in-use':     'An account with this email already exists.',
+        'auth/weak-password':            'Password must be at least 6 characters.',
+        'auth/too-many-requests':        'Too many attempts. Please try again later.',
+        'auth/popup-closed-by-user':     '',
+      };
+      return map[code] || 'Something went wrong. Please try again.';
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && document.getElementById('auth-overlay').classList.contains('open')) {
+        submitAuth();
+      }
+    });
 
     // ── Difficulty ────────────────────────────────────────────
     const DIFFICULTY = {
