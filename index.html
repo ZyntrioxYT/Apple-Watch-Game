@@ -802,7 +802,8 @@
       }
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        handleTap();
+        if (!running) startGame();
+        else handleTap();
       }
     });
 
