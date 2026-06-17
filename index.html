@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Watch Tap Game</title>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: black;
+      color: white;
+    }
+    button {
+      font-size: 28px;
+      padding: 25px;
+      border-radius: 20px;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Tap Game</h2>
+  <p>Score: <span id="score">0</span></p>
+  <button onclick="score++ ; document.getElementById('score').textContent = score;">
+    TAP!
+  </button>
+
+  <script>
+    let score = 0;
+  </script>
+</body>
+</html>
