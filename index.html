@@ -275,6 +275,28 @@
     #achieve-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     #achieve-toast-icon { font-size: 20px; }
 
+    /* ── Online dot ── */
+    .online-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--green); margin-left:6px; vertical-align:middle; box-shadow:0 0 5px var(--green); flex-shrink:0; }
+
+    /* ── Friends section ── */
+    .friends-search-row { display:flex; gap:8px; margin-bottom:12px; }
+    .friends-search-input { flex:1; background:rgba(255,255,255,0.07); border:1px solid var(--border); border-radius:12px; color:white; font-size:14px; padding:10px 13px; outline:none; font-family:inherit; }
+    .friends-search-input::placeholder { color:rgba(255,255,255,0.25); }
+    .friends-search-input:focus { border-color:rgba(0,200,80,0.4); }
+    .friends-search-btn { background:var(--green); color:#000; border:none; border-radius:12px; font-size:13px; font-weight:700; padding:10px 14px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .friend-item { display:flex; align-items:center; gap:10px; padding:10px 13px; border-radius:13px; background:var(--card); border:1px solid var(--border); margin-bottom:7px; }
+    .friend-item img { width:32px; height:32px; border-radius:50%; border:1.5px solid var(--border); flex-shrink:0; }
+    .friend-avatar-ph { width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+    .friend-info { flex:1; text-align:left; min-width:0; }
+    .friend-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .friend-sub  { font-size:11px; color:var(--text-dim); margin-top:1px; }
+    .friend-btn  { font-size:12px; font-weight:700; padding:6px 12px; border:none; border-radius:9px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .friend-btn.add    { background:rgba(0,200,80,0.15); color:var(--green); border:1px solid rgba(0,200,80,0.25); }
+    .friend-btn.accept { background:rgba(0,200,80,0.15); color:var(--green); border:1px solid rgba(0,200,80,0.25); }
+    .friend-btn.decline,.friend-btn.remove { background:rgba(255,80,80,0.1); color:#ff5555; border:1px solid rgba(255,80,80,0.2); }
+    .friend-btn.pending { background:rgba(255,255,255,0.05); color:var(--text-dim); border:1px solid var(--border); }
+    .friends-empty { font-size:13px; color:var(--text-dim); padding:16px 0; }
+
     /* ─── PC / WIDE SCREEN LAYOUT (≥768px) ───────────────────── */
     @media (min-width: 768px) {
       body { overflow: auto; height: auto; min-height: 100dvh; }
@@ -508,6 +530,7 @@
           <div class="lbl">Rating</div>
         </div>
       </div>
+      <button id="pm-friend-btn" class="friend-btn add" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:10px;display:none;" onclick="pmFriendAction()"></button>
       <button class="modal-close" onclick="closeModal('player-overlay')">Close</button>
     </div>
   </div>
@@ -620,6 +643,7 @@
       <div id="lb-tabs">
         <button class="lb-tab active" id="lb-tab-alltime" onclick="setLbFilter('alltime')">All Time</button>
         <button class="lb-tab" id="lb-tab-today" onclick="setLbFilter('today')">Today</button>
+        <button class="lb-tab" id="lb-tab-friends" onclick="setLbFilter('friends')">Friends</button>
       </div>
       <ol id="scores"><li id="lb-empty">Loading...</li></ol>
       <div class="challenge-row">
@@ -1051,7 +1075,7 @@
     }
 
     function syncLbTabs() {
-      ['alltime','today'].forEach(f => {
+      ['alltime','today','friends'].forEach(f => {
         document.getElementById('lb-tab-'+f)?.classList.toggle('active', f===lbFilter);
         document.getElementById('lb2-tab-'+f)?.classList.toggle('active', f===lbFilter);
       });
@@ -1062,27 +1086,36 @@
       if (!list) return;
       list.innerHTML='';
       if(snapshot.empty){ list.innerHTML='<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No scores yet</li>'; return; }
-      snapshot.docs.forEach((doc,i)=>{
-        const s=doc.data(), isMe=currentUser&&doc.id===currentUser.uid;
+      const docs = snapshot.docs ? snapshot.docs : [];
+      docs.forEach((doc,i)=>{
+        const s=doc.data(), uid=doc.id, isMe=currentUser&&uid===currentUser.uid;
         if(isMe&&listId==='scores'){ achieveStats.lbRank=i+1; checkAchievements(); }
         const li=document.createElement('li');
+        li.dataset.uid = uid;
         if(i===0) li.classList.add('best');
         if(isMe)  li.classList.add('is-me');
         const avatar=s.photoURL?'<img src="'+s.photoURL+'" alt="" referrerpolicy="no-referrer">'  :'<div class="avatar-placeholder"></div>';
         const youTag=isMe?'<span class="you-tag">YOU</span>':'';
+        const onlineDot=onlineUsers.has(uid)?'<span class="online-dot"></span>':'';
         li.innerHTML=
           '<span class="rank">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1))+'</span>'+
           avatar+
-          '<span class="lname">'+escHtml(s.name)+youTag+'</span>'+
+          '<span class="lname">'+escHtml(s.name)+youTag+onlineDot+'</span>'+
           '<span class="ltime">'+s.time+' ms</span>'+
           '<span class="lb-chevron">›</span>';
-        li.addEventListener('click',()=>openPlayerModal(s, i+1));
+        li.addEventListener('click',()=>openPlayerModal(s, i+1, uid));
         list.appendChild(li);
       });
     }
 
     function subscribeLeaderboard() {
       if(lbUnsub) lbUnsub();
+
+      if (lbFilter === 'friends') {
+        subscribeFriendsLeaderboard(['scores', 'scores-inline']);
+        return;
+      }
+
       const query = lbFilter==='alltime'
         ? db.collection('scores').orderBy('time').limit(10)
         : db.collection('daily').doc(new Date().toISOString().slice(0,10)).collection('scores').orderBy('time').limit(10);
@@ -1096,7 +1129,8 @@
     subscribeLeaderboard();
 
     // ── Player profile modal ──────────────────────────────────
-    function openPlayerModal(s, rank) {
+    function openPlayerModal(s, rank, uid) {
+      pmCurrentUid = uid || null;
       const photo = document.getElementById('pm-photo');
       if (s.photoURL) { photo.src=s.photoURL; photo.style.display='block'; }
       else { photo.style.display='none'; }
@@ -1105,6 +1139,19 @@
       document.getElementById('pm-best').textContent  = s.time + ' ms';
       const r = ratingFor(s.time);
       document.getElementById('pm-rating').textContent = r ? r.label : '—';
+
+      // friend button
+      const btn = document.getElementById('pm-friend-btn');
+      if (currentUser && uid && uid !== currentUser.uid) {
+        btn.style.display = 'block';
+        if (myFriends.has(uid))      { btn.textContent='Remove friend'; btn.className='friend-btn remove'; }
+        else if (pendingOut.has(uid)){ btn.textContent='Request sent';  btn.className='friend-btn pending'; }
+        else if (pendingIn.has(uid)) { btn.textContent='Accept request';btn.className='friend-btn accept'; }
+        else                         { btn.textContent='Add friend';    btn.className='friend-btn add'; }
+      } else {
+        btn.style.display = 'none';
+      }
+
       openModal('player-overlay');
     }
 
@@ -1153,11 +1200,22 @@
           '<div class="stat-card"><div class="stat-val">'+count+'</div><div class="stat-lbl">Total rounds</div></div>'+
         '</div>'+
         (times.length ? '<div class="chart-label">Last 10 reaction times</div><canvas id="mini-chart" height="65" style="width:100%;"></canvas>' : '')+
-        '<div class="profile-section-title">Achievements</div>'+
+        '<div class="profile-section-title">Friends</div>'+
+        '<div class="friends-search-row">'+
+          '<input class="friends-search-input" id="friend-search-input" placeholder="Search by display name..." maxlength="30" oninput="onFriendSearch(this.value)">'+
+        '</div>'+
+        '<div id="friend-search-results"></div>'+
+        '<div class="profile-section-title" style="margin-top:8px;">Friends <span id="friends-count" style="color:var(--text-dim);font-weight:500;"></span></div>'+
+        '<div id="friends-list"></div>'+
+        (pendingIn.size > 0 ?
+          '<div class="profile-section-title" style="margin-top:8px;">Pending requests <span style="background:#ff3d00;color:white;font-size:10px;font-weight:700;border-radius:8px;padding:1px 6px;margin-left:4px;">'+pendingIn.size+'</span></div>'+
+          '<div id="pending-list"></div>' : '')+
+        '<div class="profile-section-title" style="margin-top:16px;">Achievements</div>'+
         '<div class="achieve-grid">'+achieveHtml+'</div>'+
         '<div class="sign-out-row"><button class="modal-close" onclick="signOut()">Sign out</button></div>';
 
       if (times.length) setTimeout(()=>drawChart(times.slice(-10)),50);
+      setTimeout(renderFriendsList, 50);
     }
 
     function drawChart(times) {
@@ -1269,6 +1327,259 @@
       document.getElementById('mp-round-info').textContent='Game over — tap Close to play again';
       if(w) document.getElementById('mp-card-'+w).classList.add('winner');
       haptic('best');
+    }
+
+    // ── Friends list rendering ────────────────────────────────
+    async function renderFriendsList() {
+      const listEl    = document.getElementById('friends-list');
+      const pendingEl = document.getElementById('pending-list');
+      const countEl   = document.getElementById('friends-count');
+      if (!listEl) return;
+
+      if (countEl) countEl.textContent = myFriends.size > 0 ? '('+myFriends.size+')' : '';
+
+      // render confirmed friends
+      if (myFriends.size === 0) {
+        listEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add some!</div>';
+      } else {
+        const uids = [...myFriends];
+        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        listEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = uids[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          const online = onlineUsers.has(uid);
+          listEl.insertAdjacentHTML('beforeend', friendItemHtml(uid, data, 'remove', online));
+        });
+      }
+
+      // render pending incoming requests
+      if (pendingEl && pendingIn.size > 0) {
+        const uids = [...pendingIn];
+        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        pendingEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = uids[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          pendingEl.insertAdjacentHTML('beforeend', friendItemHtml(uid, data, 'accept'));
+        });
+      }
+    }
+
+    function friendItemHtml(uid, data, action, online) {
+      const avatar = data.photoURL
+        ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">'
+        : '<div class="friend-avatar-ph">👤</div>';
+      const onlineDot = online ? ' <span class="online-dot"></span>' : '';
+      const score = data.time ? data.time + ' ms' : 'No score yet';
+      let btns = '';
+      if (action === 'remove') btns = '<button class="friend-btn remove" onclick="removeFriend(\''+uid+'\');renderFriendsList()">Remove</button>';
+      if (action === 'accept') btns =
+        '<button class="friend-btn accept" onclick="acceptFriendRequest(\''+uid+'\');renderFriendsList()" style="margin-right:6px;">Accept</button>'+
+        '<button class="friend-btn decline" onclick="declineFriendRequest(\''+uid+'\');renderFriendsList()">Decline</button>';
+      return '<div class="friend-item">'+avatar+
+        '<div class="friend-info"><div class="friend-name">'+escHtml(data.name)+onlineDot+'</div>'+
+        '<div class="friend-sub">'+escHtml(score)+'</div></div>'+
+        '<div style="display:flex;gap:6px;">'+btns+'</div></div>';
+    }
+
+    let searchTimer;
+    function onFriendSearch(val) {
+      clearTimeout(searchTimer);
+      const el = document.getElementById('friend-search-results');
+      if (!val.trim()) { if (el) el.innerHTML = ''; return; }
+      searchTimer = setTimeout(async () => {
+        const results = await searchPlayers(val);
+        if (!el) return;
+        if (!results.length) { el.innerHTML = '<div class="friends-empty">No players found</div>'; return; }
+        el.innerHTML = results.map(p => {
+          const uid = p.uid;
+          let action, label;
+          if (myFriends.has(uid))     { action='remove';  label='Friends'; }
+          else if (pendingOut.has(uid)){ action='pending'; label='Sent'; }
+          else if (pendingIn.has(uid)) { action='accept';  label='Accept'; }
+          else                         { action='add';     label='Add'; }
+          return friendItemHtml(uid, p, action, onlineUsers.has(uid))
+            .replace('onclick="removeFriend', 'onclick="removeFriend')  // keep existing handlers
+            + ''; // friendItemHtml already generates correct btns for remove/accept
+        }).join('');
+        // for search results, replace accept/remove with add button for non-friends
+        el.querySelectorAll('.friend-item').forEach((item, i) => {
+          const uid = results[i].uid;
+          if (!myFriends.has(uid) && !pendingIn.has(uid) && !pendingOut.has(uid)) {
+            const btnArea = item.querySelector('div[style]');
+            if (btnArea) btnArea.innerHTML = '<button class="friend-btn add" onclick="sendFriendRequest(\''+uid+'\');this.textContent=\'Sent\';this.className=\'friend-btn pending\';this.disabled=true;">Add</button>';
+          }
+        });
+      }, 400);
+    }
+
+    // ── Online presence ──────────────────────────────────────────
+    let presenceUnsub = null;
+    const onlineUsers = new Set();
+
+    function startPresence() {
+      if (!currentUser) return;
+      const ref = db.collection('presence').doc(currentUser.uid);
+      ref.set({ uid: currentUser.uid, name: currentUser.displayName || 'Player', online: true, ts: firebase.firestore.FieldValue.serverTimestamp() });
+      // mark offline on unload
+      window.addEventListener('beforeunload', () => ref.set({ online: false, ts: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }));
+    }
+
+    function stopPresence() {
+      if (!currentUser) return;
+      db.collection('presence').doc(currentUser.uid).set({ online: false }, { merge: true });
+    }
+
+    function subscribePresence() {
+      if (presenceUnsub) presenceUnsub();
+      presenceUnsub = db.collection('presence').where('online', '==', true).onSnapshot(snap => {
+        onlineUsers.clear();
+        snap.docs.forEach(d => onlineUsers.add(d.id));
+        // re-render leaderboard dots without full refetch
+        document.querySelectorAll('#scores li[data-uid], #scores-inline li[data-uid]').forEach(li => {
+          const uid = li.dataset.uid;
+          const existing = li.querySelector('.online-dot');
+          if (onlineUsers.has(uid) && !existing) {
+            const nameEl = li.querySelector('.lname');
+            if (nameEl) nameEl.insertAdjacentHTML('beforeend', '<span class="online-dot"></span>');
+          } else if (!onlineUsers.has(uid) && existing) {
+            existing.remove();
+          }
+        });
+      });
+    }
+
+    auth.onAuthStateChanged(user => {
+      if (user) { startPresence(); subscribePresence(); }
+      else { stopPresence(); if (presenceUnsub) presenceUnsub(); }
+    });
+
+    // ── Friends ───────────────────────────────────────────────
+    let myFriends = new Set();       // uids of confirmed friends
+    let pendingOut = new Set();      // sent requests (their uid)
+    let pendingIn  = new Set();      // received requests (their uid)
+    let friendsUnsub = null, requestsUnsub = null;
+    let pmCurrentUid = null;         // uid shown in player modal
+
+    function subscribeFriends() {
+      if (!currentUser) return;
+      if (friendsUnsub)  friendsUnsub();
+      if (requestsUnsub) requestsUnsub();
+
+      // confirmed friends
+      friendsUnsub = db.collection('friends').doc(currentUser.uid).onSnapshot(doc => {
+        myFriends = new Set(doc.exists ? (doc.data().list || []) : []);
+        if (lbFilter === 'friends') subscribeLeaderboard();
+      });
+
+      // pending requests
+      requestsUnsub = db.collection('friendRequests')
+        .where('to', '==', currentUser.uid).onSnapshot(snap => {
+          pendingIn = new Set(snap.docs.filter(d => d.data().status === 'pending').map(d => d.data().from));
+          refreshFriendBadge();
+        });
+
+      db.collection('friendRequests')
+        .where('from', '==', currentUser.uid).where('status', '==', 'pending').onSnapshot(snap => {
+          pendingOut = new Set(snap.docs.map(d => d.data().to));
+        });
+    }
+
+    auth.onAuthStateChanged(user => { if (user) subscribeFriends(); });
+
+    function refreshFriendBadge() {
+      const tab = document.getElementById('tab-profile');
+      if (!tab) return;
+      const badge = tab.querySelector('.notif-badge');
+      if (pendingIn.size > 0) {
+        if (!badge) tab.querySelector('.tab-icon').insertAdjacentHTML('afterend', '<span class="notif-badge" style="position:absolute;top:8px;right:18px;background:#ff3d00;color:white;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;">'+pendingIn.size+'</span>');
+        else badge.textContent = pendingIn.size;
+      } else if (badge) badge.remove();
+    }
+
+    async function sendFriendRequest(toUid) {
+      if (!currentUser || toUid === currentUser.uid) return;
+      const id = [currentUser.uid, toUid].sort().join('_');
+      await db.collection('friendRequests').doc(id).set({ from: currentUser.uid, to: toUid, status: 'pending', ts: firebase.firestore.FieldValue.serverTimestamp() });
+      pendingOut.add(toUid);
+    }
+
+    async function acceptFriendRequest(fromUid) {
+      if (!currentUser) return;
+      const id = [currentUser.uid, fromUid].sort().join('_');
+      await db.collection('friendRequests').doc(id).update({ status: 'accepted' });
+      // add to both sides' friend lists
+      const batch = db.batch();
+      const myRef   = db.collection('friends').doc(currentUser.uid);
+      const theirRef = db.collection('friends').doc(fromUid);
+      batch.set(myRef,    { list: firebase.firestore.FieldValue.arrayUnion(fromUid) }, { merge: true });
+      batch.set(theirRef, { list: firebase.firestore.FieldValue.arrayUnion(currentUser.uid) }, { merge: true });
+      await batch.commit();
+      pendingIn.delete(fromUid);
+      myFriends.add(fromUid);
+      if (lbFilter === 'friends') subscribeLeaderboard();
+    }
+
+    async function declineFriendRequest(fromUid) {
+      if (!currentUser) return;
+      const id = [currentUser.uid, fromUid].sort().join('_');
+      await db.collection('friendRequests').doc(id).update({ status: 'declined' });
+      pendingIn.delete(fromUid);
+    }
+
+    async function removeFriend(uid) {
+      if (!currentUser) return;
+      const batch = db.batch();
+      batch.set(db.collection('friends').doc(currentUser.uid), { list: firebase.firestore.FieldValue.arrayRemove(uid) }, { merge: true });
+      batch.set(db.collection('friends').doc(uid), { list: firebase.firestore.FieldValue.arrayRemove(currentUser.uid) }, { merge: true });
+      await batch.commit();
+      myFriends.delete(uid);
+      if (lbFilter === 'friends') subscribeLeaderboard();
+    }
+
+    // friend action from player modal
+    function pmFriendAction() {
+      const uid = pmCurrentUid;
+      if (!uid || !currentUser || uid === currentUser.uid) return;
+      if (myFriends.has(uid))    { removeFriend(uid); closeModal('player-overlay'); }
+      else if (pendingOut.has(uid)) { /* already sent */ }
+      else if (pendingIn.has(uid))  { acceptFriendRequest(uid); closeModal('player-overlay'); }
+      else { sendFriendRequest(uid); document.getElementById('pm-friend-btn').textContent = 'Request sent'; document.getElementById('pm-friend-btn').className = 'friend-btn pending'; }
+    }
+
+    // search players by name (exact display name, case-insensitive via stored lowercase field)
+    async function searchPlayers(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return [];
+      // search leaderboard scores collection for matching names
+      const snap = await db.collection('scores').get();
+      return snap.docs
+        .filter(d => d.id !== currentUser?.uid && d.data().name?.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map(d => ({ uid: d.id, ...d.data() }));
+    }
+
+    // ── Friends leaderboard ───────────────────────────────────
+    function subscribeFriendsLeaderboard(listIds) {
+      if (!currentUser || myFriends.size === 0) {
+        listIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<li style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">Add friends to see their scores here</li>';
+        });
+        return;
+      }
+      const uids = [...myFriends, currentUser.uid].slice(0, 10);
+      db.collection('scores').where(firebase.firestore.FieldPath.documentId(), 'in', uids).orderBy('time').get().then(snap => {
+        if (snap.empty) {
+          listIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<li style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">None of your friends have scores yet</li>';
+          });
+          return;
+        }
+        listIds.forEach(id => renderLbSnapshot(snap, id));
+      });
     }
 
     // ── Keyboard ──────────────────────────────────────────────
