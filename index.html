@@ -275,6 +275,76 @@
     #achieve-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     #achieve-toast-icon { font-size: 20px; }
 
+    /* ─── APPLE WATCH DEDICATED UI ──────────────────────────── */
+    #watch-ui {
+      display: none;
+      position: fixed; inset: 0;
+      background: #000;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      overflow: hidden;
+    }
+
+    #watch-ui.w-bg-wait { background: radial-gradient(circle, rgba(180,20,20,0.6) 0%, #000 70%); }
+    #watch-ui.w-bg-go   { background: radial-gradient(circle, rgba(0,160,60,0.6) 0%, #000 70%); }
+
+    /* page dots */
+    #w-dots { display: flex; gap: 5px; margin-bottom: 6px; }
+    .w-dot  { width: 5px; height: 5px; border-radius: 50%; background: white; transition: opacity 0.2s; }
+
+    /* game section */
+    #w-game-section {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 100%; flex: 1;
+    }
+
+    /* the big circular tap target */
+    .w-circle {
+      width: min(58vw, 115px);
+      height: min(58vw, 115px);
+      border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: background 0.25s, box-shadow 0.25s;
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+
+    .w-circle #w-text { font-size: clamp(14px, 5vw, 20px); font-weight: 800; letter-spacing: -0.3px; }
+    .w-circle #w-sub  { font-size: clamp(8px, 3vw, 11px); opacity: 0.6; margin-top: 3px; font-weight: 600; }
+
+    .w-idle   { background: rgba(255,255,255,0.06); }
+    .w-wait   { background: rgba(180,20,20,0.55); border-color: rgba(220,50,50,0.5); box-shadow: 0 0 30px rgba(200,30,30,0.4); animation: w-pulse-wait 1.3s ease-in-out infinite; }
+    .w-go     { background: rgba(0,160,60,0.55);  border-color: rgba(0,200,80,0.6);  box-shadow: 0 0 40px rgba(0,200,80,0.5);  animation: w-pulse-go 0.5s ease-in-out infinite; }
+    .w-result { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+
+    @keyframes w-pulse-wait { 0%,100%{box-shadow:0 0 20px rgba(200,30,30,0.3);} 50%{box-shadow:0 0 40px rgba(200,30,30,0.6);} }
+    @keyframes w-pulse-go   { 0%,100%{box-shadow:0 0 25px rgba(0,200,80,0.4); transform:scale(1);} 50%{box-shadow:0 0 55px rgba(0,200,80,0.7); transform:scale(1.04);} }
+
+    #w-start {
+      margin-top: 10px;
+      font-size: clamp(9px, 3.5vw, 13px);
+      font-weight: 700;
+      padding: 5px 16px;
+      border: none; border-radius: 20px;
+      background: var(--green); color: #000;
+      cursor: pointer; font-family: inherit;
+    }
+
+    /* leaderboard section */
+    #w-lb-section {
+      display: none; flex-direction: column; align-items: stretch;
+      width: 90%; flex: 1; justify-content: center;
+    }
+
+    #w-lb-title {
+      font-size: 11px; font-weight: 700; margin-bottom: 8px;
+      color: var(--gold); text-align: center;
+    }
+
+    #w-lb-list { display: flex; flex-direction: column; gap: 1px; }
+
     /* challenge */
     #challenge-link-box { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 13px; color: rgba(255,255,255,0.6); font-size: 12px; padding: 11px 13px; margin-bottom: 11px; word-break: break-all; text-align: left; font-family: inherit; }
     .copy-btn { width: 100%; font-size: 15px; font-weight: 600; padding: 13px; border: none; border-radius: 15px; background: linear-gradient(135deg,var(--green),#00a844); color: white; cursor: pointer; margin-bottom: 9px; font-family: inherit; }
@@ -283,6 +353,31 @@
 <body class="state-idle">
 
   <canvas id="confetti-canvas"></canvas>
+
+  <!-- ─── APPLE WATCH UI ──────────────────────────────────── -->
+  <div id="watch-ui" style="display:none;">
+    <!-- Page dots -->
+    <div id="w-dots">
+      <div class="w-dot" id="w-dot-0" style="opacity:1;"></div>
+      <div class="w-dot" id="w-dot-1" style="opacity:0.3;"></div>
+    </div>
+
+    <!-- Game section -->
+    <div id="w-game-section" onclick="wTogglePage()">
+      <div id="w-tap" class="w-circle w-idle" onclick="event.stopPropagation(); watchHandleTap()">
+        <span id="w-text">Tap</span>
+        <span id="w-sub"></span>
+      </div>
+      <button id="w-start" onclick="event.stopPropagation(); watchStart()">Start</button>
+    </div>
+
+    <!-- Leaderboard section -->
+    <div id="w-lb-section" style="display:none;" onclick="wTogglePage()">
+      <div id="w-lb-title">🏆 Top 5</div>
+      <div id="w-lb-list"></div>
+    </div>
+  </div>
+
   <div id="achieve-toast"><span id="achieve-toast-icon"></span><span id="achieve-toast-text"></span></div>
 
   <!-- ─── AUTH modal ─────────────────────────────────────── -->
@@ -1075,6 +1170,124 @@
     });
 
     function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // ── Apple Watch UI ────────────────────────────────────────
+    // Activates when screen width ≤ 220px (Watch screen sizes: 38mm=136px, 40mm=162px, 44mm=184px, 49mm=205px)
+    const watchEl = document.getElementById('watch-ui');
+
+    function isWatch() { return window.innerWidth <= 220; }
+
+    function initWatchUI() {
+      if (!isWatch()) return;
+
+      // Hide the normal UI entirely
+      document.getElementById('pages').style.display = 'none';
+      document.getElementById('tab-bar').style.display = 'none';
+      watchEl.style.display = 'flex';
+
+      // wire up watch tap
+      document.getElementById('w-tap').addEventListener('click', watchHandleTap);
+      document.getElementById('w-start').addEventListener('click', watchStart);
+
+      // subscribe leaderboard for watch
+      db.collection('scores').orderBy('time').limit(5).onSnapshot(snap => {
+        const list = document.getElementById('w-lb-list');
+        if (!list) return;
+        list.innerHTML = '';
+        if (snap.empty) { list.innerHTML = '<div style="opacity:0.4;font-size:9px;">No scores yet</div>'; return; }
+        snap.docs.forEach((doc, i) => {
+          const s = doc.data();
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:9px;border-bottom:1px solid rgba(255,255,255,0.06);';
+          div.innerHTML = '<span style="opacity:0.7;margin-right:4px;">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.')+'</span>' +
+            '<span style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(s.name)+'</span>' +
+            '<span style="color:var(--green);font-weight:700;margin-left:4px;">'+s.time+'</span>';
+          list.appendChild(div);
+        });
+      });
+    }
+
+    // watch game state
+    let wWaiting=false, wReady=false, wRunning=false, wStartTime=0;
+    let wTimeout, wNextTimeout;
+
+    function watchStart() {
+      wRunning = true;
+      document.getElementById('w-start').style.display = 'none';
+      watchNextRound();
+    }
+
+    function watchNextRound() {
+      clearTimeout(wNextTimeout); clearTimeout(wTimeout);
+      wWaiting=true; wReady=false;
+      setWatchState('wait', 'Wait...', '');
+
+      const delay = Math.random() * 3000 + 1500;
+      wTimeout = setTimeout(() => {
+        setWatchState('go', 'TAP!', '');
+        wStartTime = Date.now();
+        wReady = true; wWaiting = false;
+        haptic('go');
+      }, delay);
+    }
+
+    function watchHandleTap() {
+      if (!wRunning) { watchStart(); return; }
+
+      if (wWaiting && !wReady) {
+        clearTimeout(wTimeout);
+        wWaiting = false;
+        setWatchState('idle', 'Early!', 'Tap again');
+        haptic('early');
+        wNextTimeout = setTimeout(watchNextRound, 1200);
+        return;
+      }
+
+      if (wReady) {
+        const reaction = Date.now() - wStartTime;
+        wReady = false; wWaiting = false;
+        haptic('tap'); playTapSound();
+
+        const r = ratingFor(reaction);
+        setWatchState('result', reaction + 'ms', r ? r.label : '');
+
+        if (!botMode) saveScore(reaction);
+        checkAchievements();
+
+        wNextTimeout = setTimeout(watchNextRound, 1600);
+      }
+    }
+
+    function setWatchState(state, text, sub) {
+      const tap = document.getElementById('w-tap');
+      const txt = document.getElementById('w-text');
+      const subtxt = document.getElementById('w-sub');
+      txt.textContent = text;
+      subtxt.textContent = sub;
+
+      tap.className = 'w-circle';
+      document.getElementById('watch-ui').className = '';
+
+      if (state === 'wait')   { tap.classList.add('w-wait');   document.getElementById('watch-ui').classList.add('w-bg-wait'); }
+      if (state === 'go')     { tap.classList.add('w-go');     document.getElementById('watch-ui').classList.add('w-bg-go'); }
+      if (state === 'result') { tap.classList.add('w-result'); }
+      if (state === 'idle')   { tap.classList.add('w-idle'); }
+    }
+
+    // Watch leaderboard paging
+    let wPage = 0;
+    function wTogglePage() {
+      wPage = wPage === 0 ? 1 : 0;
+      document.getElementById('w-game-section').style.display  = wPage === 0 ? 'flex' : 'none';
+      document.getElementById('w-lb-section').style.display    = wPage === 1 ? 'flex' : 'none';
+      document.getElementById('w-dot-0').style.opacity = wPage === 0 ? '1' : '0.3';
+      document.getElementById('w-dot-1').style.opacity = wPage === 1 ? '1' : '0.3';
+    }
+
+    // init on load
+    window.addEventListener('load', () => {
+      if (isWatch()) initWatchUI();
+    });
   </script>
 
   <script>
