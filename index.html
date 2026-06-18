@@ -504,9 +504,9 @@
 
   <!-- ─── INCOMING CHALLENGE POPUP ──────────────────────── -->
   <div id="challenge-popup">
-    <div class="cp-title">⚡ Challenge incoming!</div>
+    <div class="cp-title">⚡ Incoming challenge!</div>
     <div class="cp-name" id="cp-name">—</div>
-    <div class="cp-sub" id="cp-sub">wants to race you</div>
+    <div class="cp-sub" id="cp-sub">wants to challenge you!</div>
     <div class="cp-btns">
       <button class="cp-accept"  onclick="acceptChallenge()">Accept</button>
       <button class="cp-decline" onclick="declineChallenge()">Decline</button>
@@ -682,6 +682,34 @@
       </div>
     </div>
 
+    <!-- FRIENDS -->
+    <div id="page-friends" class="page">
+      <div class="page-header">
+        <span class="page-title">Friends</span>
+        <span id="friends-page-badge" style="display:none;background:#ff3d00;color:white;font-size:11px;font-weight:700;border-radius:10px;padding:2px 8px;"></span>
+      </div>
+
+      <!-- Search -->
+      <div class="friends-search-row">
+        <input class="friends-search-input" id="friends-page-search" placeholder="Search players by name..." maxlength="30" oninput="onFriendPageSearch(this.value)">
+      </div>
+      <div id="friends-page-search-results"></div>
+
+      <!-- Online now -->
+      <div class="profile-section-title" id="online-section-title" style="margin-top:4px;">Online Now</div>
+      <div id="friends-online-list"></div>
+
+      <!-- Pending requests -->
+      <div id="pending-section" style="display:none;">
+        <div class="profile-section-title" style="margin-top:14px;">Pending Requests</div>
+        <div id="friends-page-pending"></div>
+      </div>
+
+      <!-- All friends -->
+      <div class="profile-section-title" style="margin-top:14px;">All Friends <span id="friends-page-count" style="color:var(--text-dim);font-weight:500;"></span></div>
+      <div id="friends-page-all"></div>
+    </div>
+
     <!-- PROFILE -->
     <div id="page-profile" class="page">
       <div class="page-header">
@@ -703,6 +731,10 @@
     <button class="tab-item" id="tab-lb" onclick="switchPage('lb')">
       <span class="tab-icon">🏆</span>
       <span class="tab-label">Leaderboard</span>
+    </button>
+    <button class="tab-item" id="tab-friends" onclick="switchPage('friends')" style="position:relative;">
+      <span class="tab-icon">👥</span>
+      <span class="tab-label">Friends</span>
     </button>
     <button class="tab-item" id="tab-profile" onclick="switchPage('profile')">
       <span class="tab-icon">👤</span>
@@ -734,6 +766,7 @@
       document.getElementById('page-' + name).classList.add('active');
       document.getElementById('tab-' + name).classList.add('active');
       if (name === 'profile') renderProfile();
+      if (name === 'friends') renderFriendsPage();
     }
 
     // ── Auth ──────────────────────────────────────────────────
@@ -1460,9 +1493,14 @@
     let challengeUnsub = null;
 
     function sendLiveChallenge() {
-      const toUid = pmCurrentUid;
-      if (!currentUser || !toUid || toUid === currentUser.uid) return;
+      sendLiveChallengeToUid(pmCurrentUid, null);
+      const cbtn = document.getElementById('pm-challenge-btn');
+      if (cbtn) { cbtn.textContent = 'Challenge sent!'; cbtn.className = 'friend-btn pending'; cbtn.disabled = true; }
+      closeModal('player-overlay');
+    }
 
+    function sendLiveChallengeToUid(toUid, toName) {
+      if (!currentUser || !toUid || toUid === currentUser.uid) return;
       const id = currentUser.uid + '_' + toUid + '_' + Date.now();
       db.collection('challenges').doc(id).set({
         from: currentUser.uid,
@@ -1472,13 +1510,7 @@
         status: 'pending',
         ts: firebase.firestore.FieldValue.serverTimestamp()
       });
-
-      const cbtn = document.getElementById('pm-challenge-btn');
-      cbtn.textContent = 'Challenge sent!';
-      cbtn.className = 'friend-btn pending';
-      cbtn.disabled = true;
-      closeModal('player-overlay');
-      showAchieveToast({ icon: '⚡', name: 'Challenge sent!' });
+      showAchieveToast({ icon: '⚡', name: 'Challenge sent to ' + (toName || 'friend') + '!' });
     }
 
     function subscribeIncomingChallenges() {
@@ -1582,6 +1614,7 @@
       presenceUnsub = db.collection('presence').where('online', '==', true).onSnapshot(snap => {
         onlineUsers.clear();
         snap.docs.forEach(d => onlineUsers.add(d.id));
+        if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
         // re-render leaderboard dots without full refetch
         document.querySelectorAll('#scores li[data-uid], #scores-inline li[data-uid]').forEach(li => {
           const uid = li.dataset.uid;
@@ -1635,13 +1668,131 @@
     auth.onAuthStateChanged(user => { if (user) subscribeFriends(); });
 
     function refreshFriendBadge() {
-      const tab = document.getElementById('tab-profile');
+      // badge on Friends tab
+      const tab = document.getElementById('tab-friends');
       if (!tab) return;
-      const badge = tab.querySelector('.notif-badge');
+      const existing = tab.querySelector('.notif-badge');
       if (pendingIn.size > 0) {
-        if (!badge) tab.querySelector('.tab-icon').insertAdjacentHTML('afterend', '<span class="notif-badge" style="position:absolute;top:8px;right:18px;background:#ff3d00;color:white;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;">'+pendingIn.size+'</span>');
-        else badge.textContent = pendingIn.size;
-      } else if (badge) badge.remove();
+        if (!existing) tab.insertAdjacentHTML('beforeend', '<span class="notif-badge" style="position:absolute;top:6px;right:10px;background:#ff3d00;color:white;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;">'+pendingIn.size+'</span>');
+        else existing.textContent = pendingIn.size;
+      } else if (existing) existing.remove();
+
+      // badge inside friends page header
+      const pageBadge = document.getElementById('friends-page-badge');
+      if (pageBadge) {
+        if (pendingIn.size > 0) { pageBadge.textContent = pendingIn.size + ' pending'; pageBadge.style.display = 'inline-block'; }
+        else pageBadge.style.display = 'none';
+      }
+    }
+
+    async function renderFriendsPage() {
+      if (!currentUser) {
+        document.getElementById('friends-online-list').innerHTML = '<div class="friends-empty">Sign in to use Friends</div>';
+        return;
+      }
+
+      // Online friends
+      const onlineEl = document.getElementById('friends-online-list');
+      const onlineFriends = [...myFriends].filter(uid => onlineUsers.has(uid));
+      if (onlineFriends.length === 0) {
+        onlineEl.innerHTML = '<div class="friends-empty">None of your friends are online right now</div>';
+      } else {
+        const snaps = await Promise.all(onlineFriends.map(uid => db.collection('scores').doc(uid).get()));
+        onlineEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = onlineFriends[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          onlineEl.insertAdjacentHTML('beforeend', friendPageItemHtml(uid, data, true));
+        });
+      }
+
+      // Pending requests
+      const pendingSection = document.getElementById('pending-section');
+      const pendingEl = document.getElementById('friends-page-pending');
+      if (pendingIn.size > 0) {
+        pendingSection.style.display = 'block';
+        const uids = [...pendingIn];
+        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        pendingEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = uids[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
+          pendingEl.insertAdjacentHTML('beforeend',
+            '<div class="friend-item">'+avatar+
+            '<div class="friend-info"><div class="friend-name">'+escHtml(data.name)+'</div><div class="friend-sub">Wants to be friends</div></div>'+
+            '<div style="display:flex;gap:6px;">'+
+            '<button class="friend-btn accept" onclick="acceptFriendRequest(\''+uid+'\');renderFriendsPage()">Accept</button>'+
+            '<button class="friend-btn decline" onclick="declineFriendRequest(\''+uid+'\');renderFriendsPage()">Decline</button>'+
+            '</div></div>');
+        });
+      } else {
+        pendingSection.style.display = 'none';
+      }
+
+      // All friends
+      const allEl = document.getElementById('friends-page-all');
+      const countEl = document.getElementById('friends-page-count');
+      if (countEl) countEl.textContent = myFriends.size > 0 ? '('+myFriends.size+')' : '';
+      if (myFriends.size === 0) {
+        allEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add someone!</div>';
+      } else {
+        const uids = [...myFriends];
+        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        allEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = uids[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          allEl.insertAdjacentHTML('beforeend', friendPageItemHtml(uid, data, onlineUsers.has(uid)));
+        });
+      }
+    }
+
+    function friendPageItemHtml(uid, data, online) {
+      const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
+      const onlineDot = online ? ' <span class="online-dot"></span>' : '';
+      const score = data.time ? data.time + ' ms' : 'No score yet';
+      const challengeBtn = online
+        ? '<button class="friend-btn challenge" onclick="sendLiveChallengeToUid(\''+uid+'\',\''+escHtml(data.name)+'\')">⚡</button>'
+        : '';
+      return '<div class="friend-item">'+avatar+
+        '<div class="friend-info">'+
+          '<div class="friend-name">'+escHtml(data.name)+onlineDot+'</div>'+
+          '<div class="friend-sub">'+escHtml(score)+(online?' · Online now':'')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          challengeBtn+
+          '<button class="friend-btn remove" onclick="removeFriend(\''+uid+'\');renderFriendsPage()">Remove</button>'+
+        '</div></div>';
+    }
+
+    let friendPageSearchTimer;
+    function onFriendPageSearch(val) {
+      clearTimeout(friendPageSearchTimer);
+      const el = document.getElementById('friends-page-search-results');
+      if (!val.trim()) { if (el) el.innerHTML = ''; return; }
+      friendPageSearchTimer = setTimeout(async () => {
+        const results = await searchPlayers(val);
+        if (!el) return;
+        if (!results.length) { el.innerHTML = '<div class="friends-empty">No players found</div>'; return; }
+        el.innerHTML = '';
+        results.forEach(p => {
+          const uid = p.uid;
+          const avatar = p.photoURL ? '<img src="'+escHtml(p.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
+          const online = onlineUsers.has(uid);
+          const onlineDot = online ? ' <span class="online-dot"></span>' : '';
+          let btn;
+          if (myFriends.has(uid))      btn = '<button class="friend-btn remove" onclick="removeFriend(\''+uid+'\');renderFriendsPage()">Remove</button>';
+          else if (pendingOut.has(uid)) btn = '<button class="friend-btn pending" disabled>Sent</button>';
+          else if (pendingIn.has(uid))  btn = '<button class="friend-btn accept" onclick="acceptFriendRequest(\''+uid+'\');renderFriendsPage()">Accept</button>';
+          else                          btn = '<button class="friend-btn add" onclick="sendFriendRequest(\''+uid+'\');this.textContent=\'Sent\';this.className=\'friend-btn pending\';this.disabled=true;">Add</button>';
+          el.insertAdjacentHTML('beforeend',
+            '<div class="friend-item">'+avatar+
+            '<div class="friend-info"><div class="friend-name">'+escHtml(p.name)+onlineDot+'</div>'+
+            '<div class="friend-sub">'+(p.time?p.time+' ms':'No score yet')+'</div></div>'+
+            btn+'</div>');
+        });
+      }, 350);
     }
 
     async function sendFriendRequest(toUid) {
