@@ -275,6 +275,65 @@
     #achieve-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     #achieve-toast-icon { font-size: 20px; }
 
+    /* ─── PC / WIDE SCREEN LAYOUT (≥768px) ───────────────────── */
+    @media (min-width: 768px) {
+      body { overflow: auto; height: auto; min-height: 100dvh; }
+
+      /* side nav instead of bottom tabs */
+      #tab-bar {
+        position: fixed; left: 0; top: 0; bottom: 0; width: 88px;
+        flex-direction: column; justify-content: center;
+        border-top: none; border-right: 1px solid rgba(255,255,255,0.07);
+        padding-bottom: 0; gap: 4px; padding: 24px 0;
+      }
+      .tab-item { padding: 14px 0; flex-direction: column; border-radius: 0; }
+      .tab-icon  { font-size: 24px; }
+      .tab-label { font-size: 10px; }
+
+      /* shift pages right to clear sidebar */
+      #pages { margin-left: 88px; height: 100dvh; overflow: hidden; }
+
+      /* widen page content */
+      .page { padding: 0 32px 32px; }
+      #main { max-width: 520px; }
+
+      /* game page: two-column layout */
+      #page-game { flex-direction: row !important; flex-wrap: wrap; align-items: flex-start; gap: 0; padding-top: 0; }
+
+      #auth-bar { width: 100%; }
+
+      #game-col-left {
+        flex: 0 0 auto;
+        width: min(340px, 50%);
+        display: flex; flex-direction: column; align-items: center;
+        padding-right: 24px;
+      }
+
+      #game-col-right {
+        flex: 1;
+        min-width: 200px;
+        display: flex; flex-direction: column;
+        padding-top: 8px;
+      }
+
+      /* bigger watch ring on desktop */
+      #watch-ring-wrap { width: min(300px, 42vw); margin: 8px auto 20px; }
+
+      /* leaderboard wider */
+      #scores li { padding: 13px 16px; }
+
+      /* profile grid 4 cols on wide */
+      .stats-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    }
+
+    @media (min-width: 1100px) {
+      #tab-bar { width: 110px; }
+      #pages { margin-left: 110px; }
+      .tab-icon  { font-size: 26px; }
+      .tab-label { font-size: 11px; }
+      #game-col-left { width: min(380px, 45%); }
+    }
+
     /* ─── APPLE WATCH DEDICATED UI ──────────────────────────── */
     #watch-ui {
       display: none;
@@ -475,41 +534,59 @@
         <button class="auth-btn" id="sign-in-btn" onclick="openAuthModal()">Sign in</button>
       </div>
 
-      <div id="difficulty-row">
-        <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
-        <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
-        <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
+      <!-- left col: tap ring + controls -->
+      <div id="game-col-left">
+        <div id="difficulty-row">
+          <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
+          <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
+          <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
+        </div>
+
+        <div id="watch-ring-wrap">
+          <svg id="watch-svg" viewBox="0 0 296 296" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="148" cy="148" r="140" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+            <circle id="watch-arc" cx="148" cy="148" r="140"
+              stroke="var(--green)" stroke-width="6"
+              stroke-linecap="round"
+              stroke-dasharray="879.6"
+              stroke-dashoffset="879.6"
+              transform="rotate(-90 148 148)"
+              style="transition: stroke-dashoffset 0.5s ease, stroke 0.4s ease;"/>
+          </svg>
+          <div id="watch-ring" class="state-idle" onclick="handleTap()">
+            <span id="game-text">Tap Start</span>
+            <span id="game-sub"></span>
+          </div>
+        </div>
+
+        <div id="reaction-rating"></div>
+        <div id="stats-bar" style="margin-bottom:12px;"></div>
+
+        <div id="btn-row">
+          <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
+          <button class="game-btn" id="stop-btn" onclick="stopGame()">Stop</button>
+          <button class="game-btn icon-btn" onclick="openMp()" title="2-Player">👥</button>
+          <button class="game-btn icon-btn" onclick="toggleSound()" id="sound-btn" title="Sound">🔊</button>
+        </div>
+
+        <div id="guest-notice"></div>
       </div>
 
-      <!-- Apple Watch circular tap area -->
-      <div id="watch-ring-wrap">
-        <svg id="watch-svg" viewBox="0 0 296 296" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="148" cy="148" r="140" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
-          <circle id="watch-arc" cx="148" cy="148" r="140"
-            stroke="var(--green)" stroke-width="6"
-            stroke-linecap="round"
-            stroke-dasharray="879.6"
-            stroke-dashoffset="879.6"
-            transform="rotate(-90 148 148)"
-            style="transition: stroke-dashoffset 0.5s ease, stroke 0.4s ease;"/>
-        </svg>
-        <div id="watch-ring" class="state-idle" onclick="handleTap()">
-          <span id="game-text">Tap Start</span>
-          <span id="game-sub"></span>
+      <!-- right col: mini leaderboard on desktop -->
+      <div id="game-col-right">
+        <div class="page-header" style="padding-top:8px;">
+          <span class="page-title" style="font-size:16px;">Leaderboard</span>
+          <div class="lb-live"><span class="lb-live-dot"></span> Live</div>
+        </div>
+        <div id="lb-tabs-inline" style="display:flex;gap:0;background:var(--card);border-radius:12px;padding:3px;margin-bottom:12px;">
+          <button class="lb-tab active" id="lb2-tab-alltime" onclick="setLbFilter('alltime');syncLbTabs()">All Time</button>
+          <button class="lb-tab" id="lb2-tab-today" onclick="setLbFilter('today');syncLbTabs()">Today</button>
+        </div>
+        <ol id="scores-inline" style="list-style:none;display:flex;flex-direction:column;gap:7px;"></ol>
+        <div style="margin-top:12px;">
+          <button class="text-btn" onclick="openChallengeModal()">⚡ Challenge a friend</button>
         </div>
       </div>
-
-      <div id="reaction-rating"></div>
-      <div id="stats-bar" style="margin-bottom:12px;"></div>
-
-      <div id="btn-row">
-        <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
-        <button class="game-btn" id="stop-btn" onclick="stopGame()">Stop</button>
-        <button class="game-btn icon-btn" onclick="openMp()" title="2-Player">👥</button>
-        <button class="game-btn icon-btn" onclick="toggleSound()" id="sound-btn" title="Sound">🔊</button>
-      </div>
-
-      <div id="guest-notice"></div>
     </div>
 
     <!-- LEADERBOARD -->
@@ -951,6 +1028,37 @@
       subscribeLeaderboard();
     }
 
+    function syncLbTabs() {
+      ['alltime','today'].forEach(f => {
+        document.getElementById('lb-tab-'+f)?.classList.toggle('active', f===lbFilter);
+        document.getElementById('lb2-tab-'+f)?.classList.toggle('active', f===lbFilter);
+      });
+    }
+
+    function renderLbSnapshot(snapshot, listId) {
+      const list = document.getElementById(listId);
+      if (!list) return;
+      list.innerHTML='';
+      if(snapshot.empty){ list.innerHTML='<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No scores yet</li>'; return; }
+      snapshot.docs.forEach((doc,i)=>{
+        const s=doc.data(), isMe=currentUser&&doc.id===currentUser.uid;
+        if(isMe&&listId==='scores'){ achieveStats.lbRank=i+1; checkAchievements(); }
+        const li=document.createElement('li');
+        if(i===0) li.classList.add('best');
+        if(isMe)  li.classList.add('is-me');
+        const avatar=s.photoURL?'<img src="'+s.photoURL+'" alt="" referrerpolicy="no-referrer">'  :'<div class="avatar-placeholder"></div>';
+        const youTag=isMe?'<span class="you-tag">YOU</span>':'';
+        li.innerHTML=
+          '<span class="rank">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1))+'</span>'+
+          avatar+
+          '<span class="lname">'+escHtml(s.name)+youTag+'</span>'+
+          '<span class="ltime">'+s.time+' ms</span>'+
+          '<span class="lb-chevron">›</span>';
+        li.addEventListener('click',()=>openPlayerModal(s, i+1));
+        list.appendChild(li);
+      });
+    }
+
     function subscribeLeaderboard() {
       if(lbUnsub) lbUnsub();
       const query = lbFilter==='alltime'
@@ -958,26 +1066,8 @@
         : db.collection('daily').doc(new Date().toISOString().slice(0,10)).collection('scores').orderBy('time').limit(10);
 
       lbUnsub=query.onSnapshot(snapshot=>{
-        const list=document.getElementById('scores');
-        list.innerHTML='';
-        if(snapshot.empty){ list.innerHTML='<li id="lb-empty">No scores yet — be the first!</li>'; return; }
-        snapshot.docs.forEach((doc,i)=>{
-          const s=doc.data(), isMe=currentUser&&doc.id===currentUser.uid;
-          if(isMe){ achieveStats.lbRank=i+1; checkAchievements(); }
-          const li=document.createElement('li');
-          if(i===0) li.classList.add('best');
-          if(isMe)  li.classList.add('is-me');
-          const avatar=s.photoURL?'<img src="'+s.photoURL+'" alt="" referrerpolicy="no-referrer">'  :'<div class="avatar-placeholder"></div>';
-          const youTag=isMe?'<span class="you-tag">YOU</span>':'';
-          li.innerHTML=
-            '<span class="rank">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1))+'</span>'+
-            avatar+
-            '<span class="lname">'+escHtml(s.name)+youTag+'</span>'+
-            '<span class="ltime">'+s.time+' ms</span>'+
-            '<span class="lb-chevron">›</span>';
-          li.addEventListener('click',()=>openPlayerModal(s, i+1));
-          list.appendChild(li);
-        });
+        renderLbSnapshot(snapshot, 'scores');
+        renderLbSnapshot(snapshot, 'scores-inline');
       }, err=>console.error('Leaderboard error:',err));
     }
 
