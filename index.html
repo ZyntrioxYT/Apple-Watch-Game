@@ -301,6 +301,7 @@
     .friend-btn.decline,.friend-btn.remove { background:rgba(255,80,80,0.1); color:#ff5555; border:1px solid rgba(255,80,80,0.2); }
     .friend-btn.pending  { background:rgba(255,255,255,0.05); color:var(--text-dim); border:1px solid var(--border); }
     .friend-btn.challenge { background:rgba(255,196,0,0.15); color:var(--gold); border:1px solid rgba(255,196,0,0.3); }
+    .friend-btn.square { width:32px; height:32px; padding:0; border-radius:8px; display:flex; align-items:center; justify-content:center; }
     .friend-btn:disabled { opacity:0.45; cursor:not-allowed; }
     .friends-status { display:none; text-align:left; font-size:12px; font-weight:600; padding:9px 11px; border-radius:11px; margin:0 0 12px; border:1px solid var(--border); }
     .friends-status.ok { display:block; color:var(--green); background:rgba(0,200,80,0.08); border-color:rgba(0,200,80,0.22); }
@@ -1939,7 +1940,7 @@
       const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
       const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
       const challengeBtn = online
-        ? '<button class="friend-btn challenge" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
+        ? '<button class="friend-btn challenge square" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
         : '';
       return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
         '<div class="friend-info">'+
