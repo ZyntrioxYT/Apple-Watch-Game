@@ -700,11 +700,11 @@
       <div id="friends-online-list"></div>
 
       <!-- Friend requests -->
-      <div id="incoming-section" style="display:none;">
+      <div id="incoming-section">
         <div class="profile-section-title" style="margin-top:14px;">Incoming Requests</div>
         <div id="friends-page-incoming"></div>
       </div>
-      <div id="outgoing-section" style="display:none;">
+      <div id="outgoing-section">
         <div class="profile-section-title" style="margin-top:14px;">Outgoing Requests</div>
         <div id="friends-page-outgoing"></div>
       </div>
@@ -1798,8 +1798,8 @@
     async function renderFriendsPage() {
       if (!currentUser) {
         document.getElementById('friends-online-list').innerHTML = '<div class="friends-empty">Sign in to use Friends</div>';
-        document.getElementById('incoming-section').style.display = 'none';
-        document.getElementById('outgoing-section').style.display = 'none';
+        document.getElementById('friends-page-incoming').innerHTML = '';
+        document.getElementById('friends-page-outgoing').innerHTML = '';
         document.getElementById('friends-page-all').innerHTML = '';
         document.getElementById('friends-page-count').textContent = '';
         return;
@@ -1821,10 +1821,8 @@
       }
 
       // Incoming requests
-      const incomingSection = document.getElementById('incoming-section');
       const incomingEl = document.getElementById('friends-page-incoming');
       if (pendingIn.size > 0) {
-        incomingSection.style.display = 'block';
         const uids = [...pendingIn];
         const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
         incomingEl.innerHTML = '';
@@ -1841,14 +1839,12 @@
             '</div></div>');
         });
       } else {
-        incomingSection.style.display = 'none';
+        incomingEl.innerHTML = '<div class="friends-empty">No incoming requests</div>';
       }
 
       // Outgoing requests
-      const outgoingSection = document.getElementById('outgoing-section');
       const outgoingEl = document.getElementById('friends-page-outgoing');
       if (pendingOut.size > 0) {
-        outgoingSection.style.display = 'block';
         const uids = [...pendingOut];
         const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
         outgoingEl.innerHTML = '';
@@ -1863,7 +1859,7 @@
             '</div>');
         });
       } else {
-        outgoingSection.style.display = 'none';
+        outgoingEl.innerHTML = '<div class="friends-empty">No outgoing requests</div>';
       }
 
       // All friends
