@@ -253,6 +253,10 @@
     .player-stat         { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
     .player-stat .val    { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
     .player-stat .lbl    { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .player-detail-list  { display:flex; flex-direction:column; gap:7px; margin:8px 0 12px; }
+    .player-detail-row   { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px 11px; font-size:12px; }
+    .player-detail-row span:first-child { color:var(--text-dim); font-weight:600; }
+    .player-detail-row span:last-child  { color:white; font-weight:700; text-align:right; }
 
     /* multiplayer modal */
     .mp-scores { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -297,6 +301,7 @@
     .friend-btn.decline,.friend-btn.remove { background:rgba(255,80,80,0.1); color:#ff5555; border:1px solid rgba(255,80,80,0.2); }
     .friend-btn.pending  { background:rgba(255,255,255,0.05); color:var(--text-dim); border:1px solid var(--border); }
     .friend-btn.challenge { background:rgba(255,196,0,0.15); color:var(--gold); border:1px solid rgba(255,196,0,0.3); }
+    .friend-btn:disabled { opacity:0.45; cursor:not-allowed; }
     .friends-status { display:none; text-align:left; font-size:12px; font-weight:600; padding:9px 11px; border-radius:11px; margin:0 0 12px; border:1px solid var(--border); }
     .friends-status.ok { display:block; color:var(--green); background:rgba(0,200,80,0.08); border-color:rgba(0,200,80,0.22); }
     .friends-status.error { display:block; color:#ff7070; background:rgba(255,80,80,0.08); border-color:rgba(255,80,80,0.22); }
@@ -563,6 +568,11 @@
           <div class="val" id="pm-rating">—</div>
           <div class="lbl">Rating</div>
         </div>
+      </div>
+      <div class="player-detail-list">
+        <div class="player-detail-row"><span>Status</span><span id="pm-status">—</span></div>
+        <div class="player-detail-row"><span>Friend status</span><span id="pm-friend-status">—</span></div>
+        <div class="player-detail-row"><span>Last best</span><span id="pm-last-best">—</span></div>
       </div>
       <button id="pm-challenge-btn" class="friend-btn challenge" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:8px;display:none;" onclick="sendLiveChallenge()">⚡ Challenge</button>
       <button id="pm-friend-btn" class="friend-btn add" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:10px;display:none;" onclick="pmFriendAction()"></button>
@@ -1247,23 +1257,42 @@
     subscribeLeaderboard();
 
     // ── Player profile modal ──────────────────────────────────
+    function formatScoreTimestamp(ts) {
+      if (!ts) return 'Unknown';
+      const date = typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+      if (Number.isNaN(date.getTime())) return 'Unknown';
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function friendStatusLabel(uid) {
+      if (!currentUser || !uid || uid === currentUser.uid) return 'You';
+      if (myFriends.has(uid)) return 'Friend';
+      if (pendingOut.has(uid)) return 'Request sent';
+      if (pendingIn.has(uid)) return 'Wants to add you';
+      return 'Not friends';
+    }
+
     function openPlayerModal(s, rank, uid) {
       pmCurrentUid = uid || null;
       const photo = document.getElementById('pm-photo');
       if (s.photoURL) { photo.src=s.photoURL; photo.style.display='block'; }
       else { photo.style.display='none'; }
       document.getElementById('pm-name').textContent  = escHtml(s.name);
-      document.getElementById('pm-rank').textContent  = rankLabel(rank) + ' on leaderboard';
-      document.getElementById('pm-best').textContent  = s.time + ' ms';
-      const r = ratingFor(s.time);
+      document.getElementById('pm-rank').textContent  = typeof rank === 'number' ? rankLabel(rank) + ' on leaderboard' : rank;
+      document.getElementById('pm-best').textContent  = s.time ? s.time + ' ms' : 'No score';
+      const r = s.time ? ratingFor(s.time) : null;
       document.getElementById('pm-rating').textContent = r ? r.label : '—';
+      document.getElementById('pm-status').textContent = onlineUsers.has(uid) ? 'Online now' : 'Offline';
+      document.getElementById('pm-friend-status').textContent = friendStatusLabel(uid);
+      document.getElementById('pm-last-best').textContent = formatScoreTimestamp(s.timestamp);
 
       // challenge button — only if online friend
       const cbtn = document.getElementById('pm-challenge-btn');
-      if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid) && onlineUsers.has(uid)) {
+      if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid)) {
         cbtn.style.display = 'block';
-        cbtn.textContent = '⚡ Challenge';
+        cbtn.textContent = onlineUsers.has(uid) ? '⚡ Challenge' : '⚡ Challenge when online';
         cbtn.className = 'friend-btn challenge';
+        cbtn.disabled = !onlineUsers.has(uid);
       } else {
         cbtn.style.display = 'none';
       }
@@ -1284,6 +1313,7 @@
     }
 
     function rankLabel(r) {
+      if (typeof r !== 'number') return r || 'Player';
       return r===1?'🥇 #1':r===2?'🥈 #2':r===3?'🥉 #3':('#'+r);
     }
 
@@ -1905,18 +1935,30 @@
       const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
       const onlineDot = online ? ' <span class="online-dot"></span>' : '';
       const score = data.time ? data.time + ' ms' : 'No score yet';
+      const rank = myFriends.has(uid) ? 'Friend' : 'Player';
+      const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
+      const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
       const challengeBtn = online
-        ? '<button class="friend-btn challenge" onclick="sendLiveChallengeToUid(\''+uid+'\',\''+escHtml(data.name)+'\')">⚡</button>'
+        ? '<button class="friend-btn challenge" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
         : '';
-      return '<div class="friend-item">'+avatar+
+      return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
         '<div class="friend-info">'+
           '<div class="friend-name">'+escHtml(data.name)+onlineDot+'</div>'+
           '<div class="friend-sub">'+escHtml(score)+(online?' · Online now':'')+'</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;">'+
           challengeBtn+
-          '<button class="friend-btn remove" onclick="removeFriend(\''+uid+'\');renderFriendsPage()">Remove</button>'+
+          '<button class="friend-btn remove" onclick="event.stopPropagation();removeFriend(\''+uid+'\');renderFriendsPage()">Remove</button>'+
         '</div></div>';
+    }
+
+    function openFriendProfileFromCard(card) {
+      try {
+        const s = JSON.parse(decodeURIComponent(card.dataset.player || '{}'));
+        openPlayerModal(s, card.dataset.rank || 'Friend', s.uid);
+      } catch (err) {
+        console.error('Could not open friend profile:', err);
+      }
     }
 
     let friendPageSearchTimer;
