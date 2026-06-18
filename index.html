@@ -354,7 +354,7 @@
       #game-col-right {
         flex: 1;
         min-width: 240px;
-        display: flex; flex-direction: column;
+        display: flex !important; flex-direction: column;
         padding-top: 8px; padding-left: 28px;
       }
 
@@ -650,7 +650,7 @@
       </div>
 
       <!-- right col: mini leaderboard on desktop -->
-      <div id="game-col-right">
+      <div id="game-col-right" style="display:none;">
         <div class="page-header" style="padding-top:8px;">
           <span class="page-title" style="font-size:16px;">Leaderboard</span>
           <div class="lb-live"><span class="lb-live-dot"></span> Live</div>

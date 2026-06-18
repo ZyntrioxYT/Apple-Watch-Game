@@ -1,4 +1,4 @@
-const CACHE = 'reaction-game-v7';
+const CACHE = 'reaction-game-v8';
 const ASSETS = [
   '/Apple-Watch-Game/',
   '/Apple-Watch-Game/index.html',
