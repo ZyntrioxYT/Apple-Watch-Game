@@ -207,6 +207,41 @@
     /* ── Challenge modal ── */
     #challenge-link-box { width: 100%; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; color: rgba(255,255,255,0.7); font-size: 13px; padding: 12px 14px; margin-bottom: 12px; word-break: break-all; text-align: left; font-family: inherit; }
     .copy-btn { width: 100%; font-size: 15px; font-weight: 600; padding: 14px; border: none; border-radius: 16px; background: linear-gradient(135deg,#00c853,#00a844); color: white; cursor: pointer; margin-bottom: 10px; font-family: inherit; }
+
+    /* ── Reaction rating ── */
+    #reaction-rating { font-size: 22px; font-weight: 800; margin-top: 4px; min-height: 28px; letter-spacing: -0.3px; transition: opacity 0.3s; }
+
+    /* ── Achievements modal ── */
+    .achieve-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; max-height: 55vh; overflow-y: auto; }
+    .achieve-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); }
+    .achieve-item.unlocked { background: rgba(0,200,80,0.07); border-color: rgba(0,200,80,0.2); }
+    .achieve-icon { font-size: 24px; flex-shrink: 0; width: 36px; text-align: center; }
+    .achieve-locked .achieve-icon { filter: grayscale(1); opacity: 0.3; }
+    .achieve-info { flex: 1; text-align: left; }
+    .achieve-name { font-size: 14px; font-weight: 700; }
+    .achieve-locked .achieve-name { color: rgba(255,255,255,0.3); }
+    .achieve-desc { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+    .achieve-new { font-size: 10px; font-weight: 700; color: #00c853; background: rgba(0,200,80,0.15); border-radius: 6px; padding: 2px 7px; margin-left: 6px; vertical-align: middle; }
+
+    /* ── Achievement toast ── */
+    #achieve-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: #18181f; border: 1px solid rgba(0,200,80,0.3); border-radius: 16px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; z-index: 300; transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s; opacity: 0; white-space: nowrap; box-shadow: 0 8px 30px rgba(0,0,0,0.4); pointer-events: none; }
+    #achieve-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #achieve-toast-icon { font-size: 22px; }
+
+    /* ── Multiplayer modal ── */
+    #mp-state { font-size: 14px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
+    .mp-scores { display: flex; gap: 10px; margin-bottom: 16px; }
+    .mp-score-card { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px; }
+    .mp-score-card.winner { background: rgba(255,196,0,0.1); border-color: rgba(255,196,0,0.3); }
+    .mp-player-name { font-size: 13px; color: rgba(255,255,255,0.5); font-weight: 600; margin-bottom: 4px; }
+    .mp-player-score { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    .mp-score-card.winner .mp-player-score { color: #ffd700; }
+    .mp-round-info { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 16px; }
+    #mp-game-box { width: 100%; aspect-ratio: 3/2; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; cursor: pointer; margin-bottom: 14px; transition: background 0.2s, border-color 0.2s; -webkit-tap-highlight-color: transparent; }
+    #mp-game-box.mp-wait { background: rgba(200,40,40,0.2); border-color: rgba(220,60,60,0.4); animation: pulse-wait 1.5s ease-in-out infinite; }
+    #mp-game-box.mp-go   { background: rgba(0,190,80,0.25); border-color: rgba(0,220,90,0.5); animation: pulse-go 0.6s ease-in-out infinite; }
+    #mp-game-box.mp-result { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+    #mp-sub { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 6px; min-height: 18px; }
   </style>
 </head>
 <body class="state-idle">
@@ -248,6 +283,45 @@
         Continue with Google
       </button>
       <button class="auth-cancel" onclick="closeModal('auth-overlay')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Achievement toast -->
+  <div id="achieve-toast">
+    <span id="achieve-toast-icon"></span>
+    <span id="achieve-toast-text"></span>
+  </div>
+
+  <!-- Achievements modal -->
+  <div id="achieve-overlay" class="modal-overlay" onclick="handleOverlayClick(event,'achieve-overlay')">
+    <div class="modal-sheet">
+      <h2>Achievements</h2>
+      <div class="achieve-grid" id="achieve-list"></div>
+      <button class="modal-close" onclick="closeModal('achieve-overlay')">Close</button>
+    </div>
+  </div>
+
+  <!-- Multiplayer modal -->
+  <div id="mp-overlay" class="modal-overlay" onclick="handleOverlayClick(event,'mp-overlay')">
+    <div class="modal-sheet">
+      <h2>2-Player Race</h2>
+      <div id="mp-state">Pass the device — best of 5 rounds each!</div>
+      <div class="mp-scores">
+        <div class="mp-score-card" id="mp-card-1">
+          <div class="mp-player-name" id="mp-name-1">Player 1</div>
+          <div class="mp-player-score" id="mp-score-1">0</div>
+        </div>
+        <div class="mp-score-card" id="mp-card-2">
+          <div class="mp-player-name" id="mp-name-2">Player 2</div>
+          <div class="mp-player-score" id="mp-score-2">0</div>
+        </div>
+      </div>
+      <div class="mp-round-info" id="mp-round-info">Round 1 of 10 · Player 1's turn</div>
+      <div id="mp-game-box" onclick="mpTap()">
+        <span id="mp-text">Tap to start</span>
+        <span id="mp-sub"></span>
+      </div>
+      <button class="modal-close" onclick="closeModal('mp-overlay'); mpReset()">Close</button>
     </div>
   </div>
 
@@ -308,12 +382,15 @@
       <span id="game-sub"></span>
     </div>
 
+    <div id="reaction-rating"></div>
     <div id="stats"></div>
 
     <div id="btn-row">
       <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
       <button class="game-btn" id="stop-btn" onclick="stopGame()">Stop</button>
       <button class="game-btn" id="stats-btn" onclick="openStatsModal()" title="Stats">📊</button>
+      <button class="game-btn" id="achieve-btn" onclick="openAchievements()" title="Achievements">🏅</button>
+      <button class="game-btn" id="mp-btn" onclick="openMp()" title="2-Player">👥</button>
       <button class="game-btn" id="sound-btn" onclick="toggleSound()" title="Sound">🔊</button>
     </div>
 
@@ -521,6 +598,7 @@
         gameSub.textContent  = difficulty === 'hard' ? 'Be quick!' : '';
         startTime = Date.now();
         ready = true;
+        haptic('go');
         if (botMode) scheduleBotTap();
         if (cfg.window) {
           windowTimeout = setTimeout(() => {
@@ -544,7 +622,9 @@
         setGameState('result');
         gameText.textContent = 'Too early!';
         gameSub.textContent  = '';
+        document.getElementById('reaction-rating').textContent = '';
         waiting = false;
+        haptic('early');
         updateStats();
         if (running) nextRoundTimeout = setTimeout(nextRound, 1300);
         return;
@@ -557,11 +637,18 @@
         void gameEl.offsetWidth;
         gameEl.classList.add('flash');
         if (soundOn) playTapSound();
+        haptic('tap');
 
         setGameState('result');
         gameText.textContent = reaction + ' ms';
         sessionTimes.push(reaction);
         streak++;
+        maxStreakSession = Math.max(maxStreakSession, streak);
+
+        // track totals for achievements
+        const tr = parseInt(localStorage.getItem('totalRounds') || '0') + 1;
+        localStorage.setItem('totalRounds', tr);
+        localStorage.setItem('maxStreak', Math.max(parseInt(localStorage.getItem('maxStreak') || '0'), maxStreakSession));
 
         const isNewAllTimeBest = !botMode && currentUser && (allTimeBest === null || reaction < allTimeBest);
         const isSessionBest    = sessionTimes.length > 1 && reaction === Math.min(...sessionTimes);
@@ -569,6 +656,7 @@
         if (isNewAllTimeBest) {
           gameSub.textContent = '🏆 New personal best!';
           launchConfetti();
+          haptic('best');
         } else if (isSessionBest) {
           gameSub.textContent = 'New session best!';
         } else if (streak >= 3) {
@@ -577,7 +665,11 @@
           gameSub.textContent = '';
         }
 
-        if (!botMode) saveScore(reaction);
+        if (!botMode) {
+          showRating(reaction);
+          saveScore(reaction);
+          checkAchievements();
+        }
         waiting = false; ready = false;
         updateStats();
         if (running) nextRoundTimeout = setTimeout(nextRound, 1400);
@@ -777,6 +869,7 @@
           const s    = doc.data();
           const li   = document.createElement('li');
           const isMe = currentUser && doc.id === currentUser.uid;
+          if (isMe) { achieveStats.lbRank = i + 1; checkAchievements(); }
           if (i === 0) li.classList.add('best');
           if (isMe)    li.classList.add('is-me');
           const avatar = s.photoURL ? '<img src="' + s.photoURL + '" alt="" referrerpolicy="no-referrer">' : '<div class="avatar-placeholder"></div>';
@@ -828,6 +921,291 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
+    // ── Haptics ───────────────────────────────────────────────
+    function haptic(type) {
+      if (!navigator.vibrate) return;
+      if (type === 'tap')   navigator.vibrate(30);
+      if (type === 'go')    navigator.vibrate([20, 10, 20]);
+      if (type === 'early') navigator.vibrate([60, 30, 60]);
+      if (type === 'best')  navigator.vibrate([20,10,20,10,40]);
+    }
+
+    // ── Reaction rating ───────────────────────────────────────
+    const RATINGS = [
+      { max: 150,  label: '⚡ Superhuman',  color: '#ff4fc8' },
+      { max: 200,  label: '🥷 Ninja',        color: '#00c853' },
+      { max: 250,  label: '🎯 Sharp',        color: '#4db8ff' },
+      { max: 320,  label: '👍 Human',        color: '#ffd700' },
+      { max: 420,  label: '😐 Average',      color: '#aaa'    },
+      { max: 9999, label: '🐢 Slow',         color: '#ff5555' },
+    ];
+
+    function showRating(ms) {
+      const r = RATINGS.find(r => ms < r.max);
+      const el = document.getElementById('reaction-rating');
+      el.textContent = r.label;
+      el.style.color = r.color;
+      el.style.opacity = '1';
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+    }
+
+    // ── Achievements ──────────────────────────────────────────
+    const ACHIEVEMENTS = [
+      { id: 'first',    icon: '🎮', name: 'First Tap',        desc: 'Complete your first round',           check: (s) => s.totalRounds >= 1 },
+      { id: 'sub300',   icon: '⚡', name: 'Sub 300ms',        desc: 'React in under 300ms',                check: (s) => s.best !== null && s.best < 300 },
+      { id: 'sub250',   icon: '🎯', name: 'Sub 250ms',        desc: 'React in under 250ms',                check: (s) => s.best !== null && s.best < 250 },
+      { id: 'sub200',   icon: '🥷', name: 'Ninja',            desc: 'React in under 200ms',                check: (s) => s.best !== null && s.best < 200 },
+      { id: 'sub150',   icon: '⚡', name: 'Superhuman',       desc: 'React in under 150ms',                check: (s) => s.best !== null && s.best < 150 },
+      { id: 'streak5',  icon: '🔥', name: 'On Fire',          desc: '5-round clean streak',                check: (s) => s.maxStreak >= 5 },
+      { id: 'streak10', icon: '🌋', name: 'Unstoppable',      desc: '10-round clean streak',               check: (s) => s.maxStreak >= 10 },
+      { id: 'rounds10', icon: '🏃', name: 'Warming Up',       desc: 'Play 10 rounds',                      check: (s) => s.totalRounds >= 10 },
+      { id: 'rounds50', icon: '💪', name: 'Dedicated',        desc: 'Play 50 rounds',                      check: (s) => s.totalRounds >= 50 },
+      { id: 'top3',     icon: '🏆', name: 'Top 3',            desc: 'Reach top 3 on the leaderboard',      check: (s) => s.lbRank !== null && s.lbRank <= 3 },
+      { id: 'first1',   icon: '🥇', name: 'Champion',         desc: 'Reach #1 on the leaderboard',         check: (s) => s.lbRank === 1 },
+    ];
+
+    let achieveStats = { best: null, totalRounds: 0, maxStreak: 0, lbRank: null };
+    let unlockedAchieves = new Set(JSON.parse(localStorage.getItem('achievements') || '[]'));
+    let maxStreakSession = 0;
+
+    function checkAchievements() {
+      achieveStats.best        = allTimeBest;
+      achieveStats.totalRounds = parseInt(localStorage.getItem('totalRounds') || '0');
+      achieveStats.maxStreak   = Math.max(parseInt(localStorage.getItem('maxStreak') || '0'), maxStreakSession);
+
+      ACHIEVEMENTS.forEach(a => {
+        if (!unlockedAchieves.has(a.id) && a.check(achieveStats)) {
+          unlockedAchieves.add(a.id);
+          localStorage.setItem('achievements', JSON.stringify([...unlockedAchieves]));
+          showAchieveToast(a);
+        }
+      });
+    }
+
+    function showAchieveToast(a) {
+      const toast = document.getElementById('achieve-toast');
+      document.getElementById('achieve-toast-icon').textContent = a.icon;
+      document.getElementById('achieve-toast-text').textContent = 'Achievement: ' + a.name;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function openAchievements() {
+      checkAchievements();
+      const list = document.getElementById('achieve-list');
+      list.innerHTML = '';
+      ACHIEVEMENTS.forEach(a => {
+        const unlocked = unlockedAchieves.has(a.id);
+        const div = document.createElement('div');
+        div.className = 'achieve-item ' + (unlocked ? 'unlocked' : 'achieve-locked');
+        div.innerHTML = '<div class="achieve-icon">' + a.icon + '</div>' +
+          '<div class="achieve-info"><div class="achieve-name">' + a.name + '</div>' +
+          '<div class="achieve-desc">' + a.desc + '</div></div>';
+        list.appendChild(div);
+      });
+      openModal('achieve-overlay');
+    }
+
+    // ── Multiplayer race ──────────────────────────────────────
+    const MP_ROUNDS = 5;
+    let mpRound = 0, mpCurrentPlayer = 1;
+    let mpScores = [[], []];
+    let mpWaiting = false, mpReady = false;
+    let mpTimeout, mpWindowTimeout;
+
+    function openMp() {
+      mpReset();
+      openModal('mp-overlay');
+    }
+
+    function mpReset() {
+      mpRound = 0; mpCurrentPlayer = 1;
+      mpScores = [[], []];
+      mpWaiting = false; mpReady = false;
+      clearTimeout(mpTimeout); clearTimeout(mpWindowTimeout);
+      document.getElementById('mp-score-1').textContent = '0';
+      document.getElementById('mp-score-2').textContent = '0';
+      document.getElementById('mp-card-1').classList.remove('winner');
+      document.getElementById('mp-card-2').classList.remove('winner');
+      document.getElementById('mp-text').textContent = 'Tap to start';
+      document.getElementById('mp-sub').textContent = '';
+      document.getElementById('mp-game-box').className = '';
+      document.getElementById('mp-state').textContent = 'Pass the device — best of ' + MP_ROUNDS + ' rounds each!';
+      mpUpdateRoundInfo();
+    }
+
+    function mpUpdateRoundInfo() {
+      const total = MP_ROUNDS * 2;
+      const current = mpRound + 1;
+      if (mpRound >= total) return;
+      document.getElementById('mp-round-info').textContent =
+        'Round ' + current + ' of ' + total + ' · Player ' + mpCurrentPlayer + '\'s turn';
+      document.getElementById('mp-name-1').textContent = 'Player 1' + (mpCurrentPlayer === 1 ? ' 👆' : '');
+      document.getElementById('mp-name-2').textContent = 'Player 2' + (mpCurrentPlayer === 2 ? ' 👆' : '');
+    }
+
+    function mpTap() {
+      const box = document.getElementById('mp-game-box');
+      const txt = document.getElementById('mp-text');
+      const sub = document.getElementById('mp-sub');
+
+      // Start a round
+      if (!mpWaiting && !mpReady) {
+        if (mpRound >= MP_ROUNDS * 2) return;
+        mpWaiting = true;
+        box.className = 'mp-wait';
+        txt.textContent = 'Wait...';
+        sub.textContent = '';
+        const delay = Math.random() * 3000 + 1500;
+        clearTimeout(mpTimeout);
+        mpTimeout = setTimeout(() => {
+          box.className = 'mp-go';
+          txt.textContent = 'TAP!';
+          sub.textContent = '';
+          mpReady = true;
+          mpWaiting = false;
+        }, delay);
+        return;
+      }
+
+      if (mpWaiting && !mpReady) {
+        clearTimeout(mpTimeout);
+        mpWaiting = false;
+        box.className = 'mp-result';
+        txt.textContent = 'Too early!';
+        sub.textContent = 'Tap to try again';
+        haptic('early');
+        return;
+      }
+
+      if (mpReady) {
+        clearTimeout(mpWindowTimeout);
+        const reaction = Date.now() - mpStartTime;
+        mpReady = false; mpWaiting = false;
+        haptic('tap');
+
+        const playerIdx = mpCurrentPlayer - 1;
+        mpScores[playerIdx].push(reaction);
+
+        const avg = Math.round(mpScores[playerIdx].reduce((a,b)=>a+b,0) / mpScores[playerIdx].length);
+        document.getElementById('mp-score-' + mpCurrentPlayer).textContent = avg + ' ms';
+
+        box.className = 'mp-result';
+        txt.textContent = reaction + ' ms';
+        sub.textContent = ratingLabel(reaction);
+
+        mpRound++;
+
+        if (mpRound >= MP_ROUNDS * 2) {
+          mpFinish();
+          return;
+        }
+
+        mpCurrentPlayer = mpCurrentPlayer === 1 ? 2 : 1;
+        mpUpdateRoundInfo();
+
+        setTimeout(() => {
+          txt.textContent = 'Tap to continue';
+          sub.textContent = '';
+          box.className = '';
+        }, 1500);
+      }
+    }
+
+    let mpStartTime = 0;
+    const _origMpTimeout = mpTimeout;
+
+    // patch: set mpStartTime when green fires
+    function mpStartGreen() {
+      document.getElementById('mp-game-box').className = 'mp-go';
+      document.getElementById('mp-text').textContent = 'TAP!';
+      document.getElementById('mp-sub').textContent = '';
+      mpStartTime = Date.now();
+      mpReady = true;
+      mpWaiting = false;
+    }
+
+    // re-wire mp tap to use mpStartGreen
+    document.getElementById('mp-game-box').onclick = function() {
+      const box = document.getElementById('mp-game-box');
+      const txt = document.getElementById('mp-text');
+      const sub = document.getElementById('mp-sub');
+
+      if (!mpWaiting && !mpReady) {
+        if (mpRound >= MP_ROUNDS * 2) return;
+        mpWaiting = true;
+        box.className = 'mp-wait';
+        txt.textContent = 'Wait...';
+        sub.textContent = '';
+        const delay = Math.random() * 3000 + 1500;
+        clearTimeout(mpTimeout);
+        mpTimeout = setTimeout(mpStartGreen, delay);
+        return;
+      }
+
+      if (mpWaiting && !mpReady) {
+        clearTimeout(mpTimeout);
+        mpWaiting = false;
+        box.className = 'mp-result';
+        txt.textContent = 'Too early!';
+        sub.textContent = 'Tap to try again';
+        haptic('early');
+        return;
+      }
+
+      if (mpReady) {
+        const reaction = Date.now() - mpStartTime;
+        mpReady = false; mpWaiting = false;
+        haptic('tap');
+
+        const playerIdx = mpCurrentPlayer - 1;
+        mpScores[playerIdx].push(reaction);
+
+        const avg = Math.round(mpScores[playerIdx].reduce((a,b)=>a+b,0) / mpScores[playerIdx].length);
+        document.getElementById('mp-score-' + mpCurrentPlayer).textContent = avg + ' ms';
+
+        box.className = 'mp-result';
+        txt.textContent = reaction + ' ms';
+        sub.textContent = ratingLabel(reaction);
+
+        mpRound++;
+
+        if (mpRound >= MP_ROUNDS * 2) {
+          mpFinish();
+          return;
+        }
+
+        mpCurrentPlayer = mpCurrentPlayer === 1 ? 2 : 1;
+        mpUpdateRoundInfo();
+
+        setTimeout(() => {
+          txt.textContent = 'Tap to continue';
+          sub.textContent = '';
+          box.className = '';
+        }, 1500);
+      }
+    };
+
+    function mpFinish() {
+      const avg1 = mpScores[0].length ? Math.round(mpScores[0].reduce((a,b)=>a+b,0)/mpScores[0].length) : 9999;
+      const avg2 = mpScores[1].length ? Math.round(mpScores[1].reduce((a,b)=>a+b,0)/mpScores[1].length) : 9999;
+      const winner = avg1 < avg2 ? 1 : avg2 < avg1 ? 2 : 0;
+
+      document.getElementById('mp-game-box').className = 'mp-result';
+      document.getElementById('mp-text').textContent   = winner ? 'Player ' + winner + ' wins! 🎉' : 'Tie!';
+      document.getElementById('mp-sub').textContent    = avg1 + ' ms vs ' + avg2 + ' ms';
+      document.getElementById('mp-round-info').textContent = 'Game over';
+      document.getElementById('mp-state').textContent  = 'Tap Close to play again';
+      if (winner) document.getElementById('mp-card-' + winner).classList.add('winner');
+      haptic('best');
+    }
+
+    function ratingLabel(ms) {
+      const r = RATINGS.find(r => ms < r.max);
+      return r ? r.label : '';
+    }
+
     // ── Keyboard controls ─────────────────────────────────────
     document.addEventListener('keydown', e => {
       if (document.getElementById('auth-overlay').classList.contains('open')) {
@@ -835,7 +1213,7 @@
         return;
       }
       if (e.key === 'Escape') {
-        ['auth-overlay','stats-overlay','challenge-overlay'].forEach(closeModal);
+        ['auth-overlay','stats-overlay','challenge-overlay','achieve-overlay','mp-overlay'].forEach(closeModal);
         return;
       }
       if (e.key === 'Enter' || e.key === ' ') {
