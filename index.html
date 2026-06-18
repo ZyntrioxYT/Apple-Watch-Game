@@ -96,14 +96,14 @@
     #sign-in-btn  { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.15); }
     #sign-out-btn { background: rgba(255,255,255,0.07); color: var(--text-dim); border: 1px solid var(--border); }
 
-    /* Apple Watch-style circular game button */
+    /* Main square game button */
     #watch-ring-wrap {
       position: relative; width: min(72vw, 280px); margin: 4px auto 16px;
       aspect-ratio: 1; flex-shrink: 0;
     }
 
     #watch-ring {
-      position: absolute; inset: 0; border-radius: 50%;
+      position: absolute; inset: 0; border-radius: 28px;
       background: var(--card); border: 2px solid var(--border);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -116,8 +116,8 @@
     #watch-ring.state-result { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); }
     #watch-ring.flash        { animation: flash 0.18s ease-out forwards !important; }
 
-    /* outer decorative ring SVG */
-    #watch-svg { position: absolute; inset: -8px; pointer-events: none; }
+    /* progress SVG is kept for game logic, hidden in the square UI */
+    #watch-svg { position: absolute; inset: -8px; pointer-events: none; display:none; }
     #watch-arc { transition: stroke-dashoffset 0.5s ease, stroke 0.5s ease; }
 
     @keyframes pulse-wait { 0%,100% { box-shadow: 0 0 35px rgba(200,40,40,0.15); } 50% { box-shadow: 0 0 60px rgba(200,40,40,0.35); } }
