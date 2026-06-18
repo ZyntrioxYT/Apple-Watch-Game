@@ -1,4 +1,4 @@
-const CACHE = 'rapid-response-v5';
+const CACHE = 'rapid-response-v6';
 const ASSETS = [
   '/Apple-Watch-Game/',
   '/Apple-Watch-Game/index.html',

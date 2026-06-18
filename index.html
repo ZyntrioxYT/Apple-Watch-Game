@@ -1291,9 +1291,9 @@
       const cbtn = document.getElementById('pm-challenge-btn');
       if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid)) {
         cbtn.style.display = 'block';
-        cbtn.textContent = onlineUsers.has(uid) ? '⚡ Challenge' : '⚡ Challenge when online';
+        cbtn.textContent = onlineUsers.has(uid) ? '⚡ Challenge' : '⚡ Send challenge';
         cbtn.className = 'friend-btn challenge';
-        cbtn.disabled = !onlineUsers.has(uid);
+        cbtn.disabled = false;
       } else {
         cbtn.style.display = 'none';
       }
@@ -1723,19 +1723,52 @@
 
     // ── Online presence ──────────────────────────────────────────
     let presenceUnsub = null;
+    let presenceHeartbeat = null;
+    let presenceUserId = null;
     const onlineUsers = new Set();
+    let presenceUnloadHandler = null;
+
+    function presencePayload(online) {
+      return {
+        uid: currentUser.uid,
+        name: currentUser.displayName || 'Player',
+        online,
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+        ts: firebase.firestore.FieldValue.serverTimestamp()
+      };
+    }
 
     function startPresence() {
       if (!currentUser) return;
+      clearInterval(presenceHeartbeat);
+      presenceUserId = currentUser.uid;
       const ref = db.collection('presence').doc(currentUser.uid);
-      ref.set({ uid: currentUser.uid, name: currentUser.displayName || 'Player', online: true, ts: firebase.firestore.FieldValue.serverTimestamp() });
+      ref.set(presencePayload(true), { merge: true }).catch(err => {
+        console.error('Presence write error:', err);
+        setFriendsStatus('Online status could not update. Check Firestore rules for presence.', 'error');
+      });
+      presenceHeartbeat = setInterval(() => {
+        if (!currentUser) return;
+        ref.set(presencePayload(true), { merge: true }).catch(err => console.error('Presence heartbeat error:', err));
+      }, 20000);
       // mark offline on unload
-      window.addEventListener('beforeunload', () => ref.set({ online: false, ts: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }));
+      if (presenceUnloadHandler) window.removeEventListener('beforeunload', presenceUnloadHandler);
+      presenceUnloadHandler = () => ref.set({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      window.addEventListener('beforeunload', presenceUnloadHandler);
     }
 
     function stopPresence() {
-      if (!currentUser) return;
-      db.collection('presence').doc(currentUser.uid).set({ online: false }, { merge: true });
+      clearInterval(presenceHeartbeat);
+      presenceHeartbeat = null;
+      if (presenceUnloadHandler) {
+        window.removeEventListener('beforeunload', presenceUnloadHandler);
+        presenceUnloadHandler = null;
+      }
+      const uid = presenceUserId || currentUser?.uid;
+      presenceUserId = null;
+      if (!uid) return;
+      db.collection('presence').doc(uid).set({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+        .catch(err => console.error('Presence stop error:', err));
     }
 
     function subscribePresence() {
@@ -1755,6 +1788,9 @@
             existing.remove();
           }
         });
+      }, err => {
+        console.error('Presence listener error:', err);
+        setFriendsStatus('Online status could not load. Check Firestore rules for presence.', 'error');
       });
     }
 
@@ -1939,7 +1975,7 @@
       const rank = myFriends.has(uid) ? 'Friend' : 'Player';
       const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
       const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
-      const challengeBtn = online
+      const challengeBtn = myFriends.has(uid)
         ? '<button class="friend-btn challenge square" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
         : '';
       return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
