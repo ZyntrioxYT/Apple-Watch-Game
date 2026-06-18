@@ -294,7 +294,26 @@
     .friend-btn.add    { background:rgba(0,200,80,0.15); color:var(--green); border:1px solid rgba(0,200,80,0.25); }
     .friend-btn.accept { background:rgba(0,200,80,0.15); color:var(--green); border:1px solid rgba(0,200,80,0.25); }
     .friend-btn.decline,.friend-btn.remove { background:rgba(255,80,80,0.1); color:#ff5555; border:1px solid rgba(255,80,80,0.2); }
-    .friend-btn.pending { background:rgba(255,255,255,0.05); color:var(--text-dim); border:1px solid var(--border); }
+    .friend-btn.pending  { background:rgba(255,255,255,0.05); color:var(--text-dim); border:1px solid var(--border); }
+    .friend-btn.challenge { background:rgba(255,196,0,0.15); color:var(--gold); border:1px solid rgba(255,196,0,0.3); }
+
+    /* ── Incoming challenge popup ── */
+    #challenge-popup {
+      position: fixed; bottom: 90px; left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      background: #1a1a24; border: 1px solid rgba(255,196,0,0.35);
+      border-radius: 20px; padding: 18px 20px; width: min(340px, 90vw);
+      z-index: 500; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      transition: transform 0.35s cubic-bezier(0.34,1.4,0.64,1), opacity 0.3s;
+      opacity: 0; pointer-events: none;
+    }
+    #challenge-popup.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: all; }
+    #challenge-popup .cp-title { font-size: 13px; color: var(--gold); font-weight: 700; margin-bottom: 4px; letter-spacing: 0.02em; }
+    #challenge-popup .cp-name  { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    #challenge-popup .cp-sub   { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; }
+    #challenge-popup .cp-btns  { display: flex; gap: 8px; }
+    #challenge-popup .cp-accept  { flex:1; padding:12px; border:none; border-radius:14px; background:linear-gradient(135deg,var(--gold),#e6b800); color:#000; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+    #challenge-popup .cp-decline { flex:1; padding:12px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:var(--text-dim); font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
     .friends-empty { font-size:13px; color:var(--text-dim); padding:16px 0; }
 
     /* ─── PC / WIDE SCREEN LAYOUT (≥768px) ───────────────────── */
@@ -483,6 +502,17 @@
 
   <div id="achieve-toast"><span id="achieve-toast-icon"></span><span id="achieve-toast-text"></span></div>
 
+  <!-- ─── INCOMING CHALLENGE POPUP ──────────────────────── -->
+  <div id="challenge-popup">
+    <div class="cp-title">⚡ Challenge incoming!</div>
+    <div class="cp-name" id="cp-name">—</div>
+    <div class="cp-sub" id="cp-sub">wants to race you</div>
+    <div class="cp-btns">
+      <button class="cp-accept"  onclick="acceptChallenge()">Accept</button>
+      <button class="cp-decline" onclick="declineChallenge()">Decline</button>
+    </div>
+  </div>
+
   <!-- ─── AUTH modal ─────────────────────────────────────── -->
   <div id="auth-overlay" class="modal-overlay" onclick="handleOverlayClick(event,'auth-overlay')">
     <div class="modal-sheet">
@@ -530,6 +560,7 @@
           <div class="lbl">Rating</div>
         </div>
       </div>
+      <button id="pm-challenge-btn" class="friend-btn challenge" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:8px;display:none;" onclick="sendLiveChallenge()">⚡ Challenge</button>
       <button id="pm-friend-btn" class="friend-btn add" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:10px;display:none;" onclick="pmFriendAction()"></button>
       <button class="modal-close" onclick="closeModal('player-overlay')">Close</button>
     </div>
@@ -1140,6 +1171,16 @@
       const r = ratingFor(s.time);
       document.getElementById('pm-rating').textContent = r ? r.label : '—';
 
+      // challenge button — only if online friend
+      const cbtn = document.getElementById('pm-challenge-btn');
+      if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid) && onlineUsers.has(uid)) {
+        cbtn.style.display = 'block';
+        cbtn.textContent = '⚡ Challenge';
+        cbtn.className = 'friend-btn challenge';
+      } else {
+        cbtn.style.display = 'none';
+      }
+
       // friend button
       const btn = document.getElementById('pm-friend-btn');
       if (currentUser && uid && uid !== currentUser.uid) {
@@ -1414,6 +1455,111 @@
       }, 400);
     }
 
+    // ── Live challenge system ─────────────────────────────────
+    let activeChallengeId = null;
+    let challengeUnsub = null;
+
+    function sendLiveChallenge() {
+      const toUid = pmCurrentUid;
+      if (!currentUser || !toUid || toUid === currentUser.uid) return;
+
+      const id = currentUser.uid + '_' + toUid + '_' + Date.now();
+      db.collection('challenges').doc(id).set({
+        from: currentUser.uid,
+        fromName: currentUser.displayName || 'Someone',
+        fromScore: allTimeBest || null,
+        to: toUid,
+        status: 'pending',
+        ts: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      const cbtn = document.getElementById('pm-challenge-btn');
+      cbtn.textContent = 'Challenge sent!';
+      cbtn.className = 'friend-btn pending';
+      cbtn.disabled = true;
+      closeModal('player-overlay');
+      showAchieveToast({ icon: '⚡', name: 'Challenge sent!' });
+    }
+
+    function subscribeIncomingChallenges() {
+      if (!currentUser) return;
+      if (challengeUnsub) challengeUnsub();
+      challengeUnsub = db.collection('challenges')
+        .where('to', '==', currentUser.uid)
+        .where('status', '==', 'pending')
+        .onSnapshot(snap => {
+          snap.docChanges().forEach(change => {
+            if (change.type === 'added') {
+              const d = change.doc.data();
+              // ignore challenges older than 30s
+              const age = d.ts ? (Date.now() - d.ts.toMillis()) : 0;
+              if (age > 30000) return;
+              showChallengePopup(change.doc.id, d);
+            }
+          });
+        });
+    }
+
+    auth.onAuthStateChanged(user => { if (user) subscribeIncomingChallenges(); });
+
+    function showChallengePopup(docId, data) {
+      activeChallengeId = docId;
+      document.getElementById('cp-name').textContent = escHtml(data.fromName);
+      document.getElementById('cp-sub').textContent = data.fromScore
+        ? 'Their best: ' + data.fromScore + ' ms — can you beat it?'
+        : 'wants to race you';
+      document.getElementById('challenge-popup').classList.add('show');
+      haptic('go');
+
+      // auto-decline after 20s
+      clearTimeout(window._challengeAutoDecline);
+      window._challengeAutoDecline = setTimeout(() => declineChallenge(), 20000);
+    }
+
+    function acceptChallenge() {
+      clearTimeout(window._challengeAutoDecline);
+      if (!activeChallengeId) return;
+      db.collection('challenges').doc(activeChallengeId).update({ status: 'accepted' });
+      document.getElementById('challenge-popup').classList.remove('show');
+      startChallengeCountdown();
+      activeChallengeId = null;
+    }
+
+    function declineChallenge() {
+      clearTimeout(window._challengeAutoDecline);
+      if (activeChallengeId) {
+        db.collection('challenges').doc(activeChallengeId).update({ status: 'declined' });
+        activeChallengeId = null;
+      }
+      document.getElementById('challenge-popup').classList.remove('show');
+    }
+
+    function startChallengeCountdown() {
+      // stop any current game, start a fresh one with a 3-2-1 countdown
+      stopGame();
+      let count = 3;
+      setGameState('wait');
+      const ringEl2 = document.getElementById('watch-ring');
+      const gameText2 = document.getElementById('game-text');
+      const gameSub2 = document.getElementById('game-sub');
+      gameText2.textContent = count;
+      gameSub2.textContent = 'Challenge starts in...';
+      haptic('tap');
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          gameText2.textContent = count;
+          haptic('tap');
+        } else {
+          clearInterval(interval);
+          gameSub2.textContent = '';
+          startGame();
+        }
+      }, 1000);
+      // switch to game tab
+      switchPage('game');
+    }
+
     // ── Online presence ──────────────────────────────────────────
     let presenceUnsub = null;
     const onlineUsers = new Set();
@@ -1585,7 +1731,7 @@
     // ── Keyboard ──────────────────────────────────────────────
     document.addEventListener('keydown', e=>{
       if(document.getElementById('auth-overlay').classList.contains('open')){ if(e.key==='Enter') submitAuth(); return; }
-      if(e.key==='Escape'){ ['auth-overlay','player-overlay','mp-overlay','challenge-overlay'].forEach(closeModal); return; }
+      if(e.key==='Escape'){ ['auth-overlay','player-overlay','mp-overlay','challenge-overlay'].forEach(closeModal); declineChallenge(); return; }
       if((e.key==='Enter'||e.key===' ')&&document.getElementById('page-game').classList.contains('active')){
         e.preventDefault();
         if(!running) startGame(); else handleTap();
