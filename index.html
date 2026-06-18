@@ -699,10 +699,14 @@
       <div class="profile-section-title" id="online-section-title" style="margin-top:4px;">Online Now</div>
       <div id="friends-online-list"></div>
 
-      <!-- Pending requests -->
-      <div id="pending-section" style="display:none;">
-        <div class="profile-section-title" style="margin-top:14px;">Pending Requests</div>
-        <div id="friends-page-pending"></div>
+      <!-- Friend requests -->
+      <div id="incoming-section" style="display:none;">
+        <div class="profile-section-title" style="margin-top:14px;">Incoming Requests</div>
+        <div id="friends-page-incoming"></div>
+      </div>
+      <div id="outgoing-section" style="display:none;">
+        <div class="profile-section-title" style="margin-top:14px;">Outgoing Requests</div>
+        <div id="friends-page-outgoing"></div>
       </div>
 
       <!-- All friends -->
@@ -771,6 +775,37 @@
 
     // ── Auth ──────────────────────────────────────────────────
     let currentUser = null;
+    let lbFilter = 'alltime';
+    let lbUnsub  = null;
+    const GUEST_ID_KEY = 'reactionGuestId';
+
+    function getGuestId() {
+      let id = localStorage.getItem(GUEST_ID_KEY);
+      if (!id) {
+        id = 'guest-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem(GUEST_ID_KEY, id);
+      }
+      return id;
+    }
+
+    function getPlayerInfo() {
+      if (currentUser) {
+        return {
+          id: currentUser.uid,
+          uid: currentUser.uid,
+          name: currentUser.displayName || 'Player',
+          photoURL: currentUser.photoURL || '',
+          isGuest: false
+        };
+      }
+      return {
+        id: getGuestId(),
+        uid: null,
+        name: 'Guest',
+        photoURL: '',
+        isGuest: true
+      };
+    }
 
     auth.onAuthStateChanged(async user => {
       currentUser = user;
@@ -786,9 +821,10 @@
       } else {
         document.getElementById('sign-in-btn').style.display = 'block';
         document.getElementById('user-info').style.display   = 'none';
-        document.getElementById('guest-notice').textContent  = 'Sign in to appear on the leaderboard';
+        document.getElementById('guest-notice').textContent  = 'Guests can place on Today. Sign in for All Time.';
         allTimeBest = null;
       }
+      subscribeLeaderboard();
     });
 
     function signOut() { auth.signOut(); }
@@ -1113,24 +1149,37 @@
 
     // ── Firestore ─────────────────────────────────────────────
     async function saveScore(time) {
-      if(!currentUser) return;
-      const ref=db.collection('scores').doc(currentUser.uid);
-      const doc=await ref.get();
-      if(!doc.exists||time<doc.data().time) {
-        allTimeBest=time;
-        await ref.set({uid:currentUser.uid,name:currentUser.displayName||'Player',photoURL:currentUser.photoURL||'',time,timestamp:firebase.firestore.FieldValue.serverTimestamp()});
+      const player = getPlayerInfo();
+
+      if (!player.isGuest) {
+        const ref = db.collection('scores').doc(player.id);
+        const doc = await ref.get();
+
+        if (!doc.exists || time < doc.data().time) {
+          allTimeBest = time;
+          await ref.set({
+            uid: player.uid, name: player.name,
+            photoURL: player.photoURL, time,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
       }
-      const today=new Date().toISOString().slice(0,10);
-      const dayRef=db.collection('daily').doc(today).collection('scores').doc(currentUser.uid);
-      const dayDoc=await dayRef.get();
-      if(!dayDoc.exists||time<dayDoc.data().time) {
-        await dayRef.set({uid:currentUser.uid,name:currentUser.displayName||'Player',photoURL:currentUser.photoURL||'',time,timestamp:firebase.firestore.FieldValue.serverTimestamp()});
+
+      // Guests can compete on Today, but only signed-in users are saved to All Time.
+      const today = new Date().toISOString().slice(0,10);
+      const dayRef = db.collection('daily').doc(today).collection('scores').doc(player.id);
+      const dayDoc = await dayRef.get();
+      if (!dayDoc.exists || time < dayDoc.data().time) {
+        await dayRef.set({
+          uid: player.uid, name: player.name,
+          photoURL: player.photoURL, time,
+          isGuest: player.isGuest,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
       }
     }
 
     // ── Leaderboard ───────────────────────────────────────────
-    let lbFilter='alltime', lbUnsub=null;
-
     function setLbFilter(f) {
       lbFilter=f;
       document.getElementById('lb-tab-alltime').classList.toggle('active',f==='alltime');
@@ -1152,7 +1201,7 @@
       if(snapshot.empty){ list.innerHTML='<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No scores yet</li>'; return; }
       const docs = snapshot.docs ? snapshot.docs : [];
       docs.forEach((doc,i)=>{
-        const s=doc.data(), uid=doc.id, isMe=currentUser&&uid===currentUser.uid;
+        const s=doc.data(), uid=doc.id, isMe=uid===getPlayerInfo().id;
         if(isMe&&listId==='scores'){ achieveStats.lbRank=i+1; checkAchievements(); }
         const li=document.createElement('li');
         li.dataset.uid = uid;
@@ -1682,34 +1731,51 @@
     let myFriends = new Set();       // uids of confirmed friends
     let pendingOut = new Set();      // sent requests (their uid)
     let pendingIn  = new Set();      // received requests (their uid)
-    let friendsUnsub = null, requestsUnsub = null;
+    let friendsUnsub = null, requestsInUnsub = null, requestsOutUnsub = null;
     let pmCurrentUid = null;         // uid shown in player modal
 
     function subscribeFriends() {
       if (!currentUser) return;
       if (friendsUnsub)  friendsUnsub();
-      if (requestsUnsub) requestsUnsub();
+      if (requestsInUnsub) requestsInUnsub();
+      if (requestsOutUnsub) requestsOutUnsub();
 
       // confirmed friends
       friendsUnsub = db.collection('friends').doc(currentUser.uid).onSnapshot(doc => {
         myFriends = new Set(doc.exists ? (doc.data().list || []) : []);
         if (lbFilter === 'friends') subscribeLeaderboard();
+        if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
       });
 
-      // pending requests
-      requestsUnsub = db.collection('friendRequests')
+      // incoming requests
+      requestsInUnsub = db.collection('friendRequests')
         .where('to', '==', currentUser.uid).onSnapshot(snap => {
           pendingIn = new Set(snap.docs.filter(d => d.data().status === 'pending').map(d => d.data().from));
           refreshFriendBadge();
+          if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
         });
 
-      db.collection('friendRequests')
+      // outgoing requests
+      requestsOutUnsub = db.collection('friendRequests')
         .where('from', '==', currentUser.uid).where('status', '==', 'pending').onSnapshot(snap => {
           pendingOut = new Set(snap.docs.map(d => d.data().to));
+          if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
         });
     }
 
-    auth.onAuthStateChanged(user => { if (user) subscribeFriends(); });
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        subscribeFriends();
+      } else {
+        if (friendsUnsub) friendsUnsub();
+        if (requestsInUnsub) requestsInUnsub();
+        if (requestsOutUnsub) requestsOutUnsub();
+        myFriends.clear();
+        pendingIn.clear();
+        pendingOut.clear();
+        refreshFriendBadge();
+      }
+    });
 
     function refreshFriendBadge() {
       // badge on Friends tab
@@ -1732,6 +1798,10 @@
     async function renderFriendsPage() {
       if (!currentUser) {
         document.getElementById('friends-online-list').innerHTML = '<div class="friends-empty">Sign in to use Friends</div>';
+        document.getElementById('incoming-section').style.display = 'none';
+        document.getElementById('outgoing-section').style.display = 'none';
+        document.getElementById('friends-page-all').innerHTML = '';
+        document.getElementById('friends-page-count').textContent = '';
         return;
       }
 
@@ -1750,19 +1820,19 @@
         });
       }
 
-      // Pending requests
-      const pendingSection = document.getElementById('pending-section');
-      const pendingEl = document.getElementById('friends-page-pending');
+      // Incoming requests
+      const incomingSection = document.getElementById('incoming-section');
+      const incomingEl = document.getElementById('friends-page-incoming');
       if (pendingIn.size > 0) {
-        pendingSection.style.display = 'block';
+        incomingSection.style.display = 'block';
         const uids = [...pendingIn];
         const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
-        pendingEl.innerHTML = '';
+        incomingEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
           const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
-          pendingEl.insertAdjacentHTML('beforeend',
+          incomingEl.insertAdjacentHTML('beforeend',
             '<div class="friend-item">'+avatar+
             '<div class="friend-info"><div class="friend-name">'+escHtml(data.name)+'</div><div class="friend-sub">Wants to be friends</div></div>'+
             '<div style="display:flex;gap:6px;">'+
@@ -1771,7 +1841,29 @@
             '</div></div>');
         });
       } else {
-        pendingSection.style.display = 'none';
+        incomingSection.style.display = 'none';
+      }
+
+      // Outgoing requests
+      const outgoingSection = document.getElementById('outgoing-section');
+      const outgoingEl = document.getElementById('friends-page-outgoing');
+      if (pendingOut.size > 0) {
+        outgoingSection.style.display = 'block';
+        const uids = [...pendingOut];
+        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        outgoingEl.innerHTML = '';
+        snaps.forEach((doc, i) => {
+          const uid = uids[i];
+          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
+          const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
+          outgoingEl.insertAdjacentHTML('beforeend',
+            '<div class="friend-item">'+avatar+
+            '<div class="friend-info"><div class="friend-name">'+escHtml(data.name)+'</div><div class="friend-sub">Request sent</div></div>'+
+            '<button class="friend-btn decline" onclick="cancelFriendRequest(\''+uid+'\');renderFriendsPage()">Cancel</button>'+
+            '</div>');
+        });
+      } else {
+        outgoingSection.style.display = 'none';
       }
 
       // All friends
@@ -1867,6 +1959,13 @@
       const id = [currentUser.uid, fromUid].sort().join('_');
       await db.collection('friendRequests').doc(id).update({ status: 'declined' });
       pendingIn.delete(fromUid);
+    }
+
+    async function cancelFriendRequest(toUid) {
+      if (!currentUser) return;
+      const id = [currentUser.uid, toUid].sort().join('_');
+      await db.collection('friendRequests').doc(id).update({ status: 'canceled' });
+      pendingOut.delete(toUid);
     }
 
     async function removeFriend(uid) {
