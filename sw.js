@@ -1,4 +1,4 @@
-const CACHE = 'reaction-game-v5';
+const CACHE = 'reaction-game-v6';
 const ASSETS = [
   '/Apple-Watch-Game/',
   '/Apple-Watch-Game/index.html',
@@ -18,9 +18,13 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Network first, fall back to cache
+// Network first, bypassing HTTP cache for page loads so GitHub Pages updates appear on the normal URL.
 self.addEventListener('fetch', e => {
+  const request = e.request.mode === 'navigate'
+    ? new Request(e.request, { cache: 'reload' })
+    : e.request;
+
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(request).catch(() => caches.match(e.request))
   );
 });
