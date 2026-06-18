@@ -162,7 +162,7 @@
     #scores li.best  { background: rgba(255,196,0,0.07); border-color: rgba(255,196,0,0.2); }
     #scores li.is-me { background: rgba(0,150,255,0.07); border-color: rgba(0,150,255,0.2); }
     #scores li img   { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--border); }
-    .rank  { font-size: 13px; font-weight: 700; color: var(--text-dim); width: 22px; text-align: center; flex-shrink: 0; }
+    .rank  { font-size: 18px; font-weight: 700; color: var(--text-dim); width: 28px; text-align: center; flex-shrink: 0; }
     li.best .rank { color: var(--gold); }
     .lname { flex: 1; text-align: left; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     li.best .lname  { color: var(--gold); }
@@ -282,11 +282,11 @@
       /* side nav instead of bottom tabs */
       #tab-bar {
         position: fixed; left: 0; top: 0; bottom: 0; width: 88px;
-        flex-direction: column; justify-content: center;
+        flex-direction: column; justify-content: center; align-items: center;
         border-top: none; border-right: 1px solid rgba(255,255,255,0.07);
         padding-bottom: 0; gap: 4px; padding: 24px 0;
       }
-      .tab-item { padding: 14px 0; flex-direction: column; border-radius: 0; }
+      .tab-item { padding: 14px 0; flex-direction: column; border-radius: 0; width: 100%; }
       .tab-icon  { font-size: 24px; }
       .tab-label { font-size: 10px; }
 
@@ -294,8 +294,7 @@
       #pages { margin-left: 88px; height: 100dvh; overflow: hidden; }
 
       /* widen page content */
-      .page { padding: 0 32px 32px; }
-      #main { max-width: 520px; }
+      .page { padding: 0 32px 32px; max-width: none; }
 
       /* game page: two-column layout */
       #page-game { flex-direction: row !important; flex-wrap: wrap; align-items: flex-start; gap: 0; padding-top: 0; }
@@ -304,23 +303,46 @@
 
       #game-col-left {
         flex: 0 0 auto;
-        width: min(340px, 50%);
+        width: min(320px, 44%);
         display: flex; flex-direction: column; align-items: center;
-        padding-right: 24px;
+        padding-right: 28px; border-right: 1px solid var(--border);
+        min-height: calc(100dvh - 60px);
       }
 
       #game-col-right {
         flex: 1;
-        min-width: 200px;
+        min-width: 240px;
         display: flex; flex-direction: column;
-        padding-top: 8px;
+        padding-top: 8px; padding-left: 28px;
       }
 
       /* bigger watch ring on desktop */
-      #watch-ring-wrap { width: min(300px, 42vw); margin: 8px auto 20px; }
+      #watch-ring-wrap { width: min(280px, 38vw); margin: 12px auto 20px; }
 
-      /* leaderboard wider */
+      /* inline leaderboard rows */
+      #scores-inline { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+      #scores-inline li {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 14px; border-radius: 14px;
+        background: var(--card); border: 1px solid var(--border);
+        cursor: pointer; transition: background 0.15s;
+      }
+      #scores-inline li:active { background: rgba(255,255,255,0.09); }
+      #scores-inline li.best  { background: rgba(255,196,0,0.07); border-color: rgba(255,196,0,0.2); }
+      #scores-inline li.is-me { background: rgba(0,150,255,0.07); border-color: rgba(0,150,255,0.2); }
+      #scores-inline li img   { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--border); }
+      #scores-inline .rank    { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+      #scores-inline li.best .rank { color: var(--gold); }
+      #scores-inline .lname   { flex: 1; text-align: left; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #scores-inline li.best .lname  { color: var(--gold); }
+      #scores-inline li.is-me .lname { color: var(--blue); }
+      #scores-inline .ltime   { font-size: 14px; font-weight: 700; color: var(--text-dim); }
+      #scores-inline li.best .ltime  { color: var(--gold); }
+      #scores-inline li.is-me .ltime { color: var(--blue); }
+
+      /* leaderboard page wider */
       #scores li { padding: 13px 16px; }
+      #scores .rank { font-size: 18px; width: 28px; }
 
       /* profile grid 4 cols on wide */
       .stats-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
@@ -331,7 +353,7 @@
       #pages { margin-left: 110px; }
       .tab-icon  { font-size: 26px; }
       .tab-label { font-size: 11px; }
-      #game-col-left { width: min(380px, 45%); }
+      #game-col-left { width: min(360px, 42%); }
     }
 
     /* ─── APPLE WATCH DEDICATED UI ──────────────────────────── */
