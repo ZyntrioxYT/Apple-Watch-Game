@@ -170,14 +170,15 @@
     .aim-hud-card .val { font-size:18px; font-weight:800; }
     .aim-hud-card .lbl { font-size:10px; color:var(--text-dim); margin-top:2px; }
     #chess-board { width:min(86vw, 340px); aspect-ratio:1; display:grid; grid-template-columns:repeat(8, 1fr); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin:4px auto 12px; }
-    .chess-square { display:flex; align-items:center; justify-content:center; font-size:clamp(22px, 8vw, 38px); border:none; font-family:"Times New Roman", serif; cursor:pointer; }
-    .chess-square.light { background:#d8c9a3; color:#141414; }
-    .chess-square.dark { background:#6d8755; color:#141414; }
+    .chess-square { display:flex; align-items:center; justify-content:center; font-size:clamp(22px, 8vw, 38px); border:none; font-family:"Times New Roman", serif; cursor:pointer; position:relative; }
+    .chess-square.light { background:#e5d7b5; color:#151515; }
+    .chess-square.dark { background:#5f7f5a; color:#151515; }
     .chess-square.selected { outline:3px solid var(--gold); outline-offset:-3px; }
     .chess-square.legal { box-shadow:inset 0 0 0 999px rgba(255,215,0,0.16); }
-    #chess-status { font-size:14px; font-weight:700; min-height:20px; margin-bottom:8px; }
-    #chess-moves { width:min(86vw, 340px); max-height:96px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; }
+    #chess-status { font-size:15px; font-weight:800; min-height:22px; margin-bottom:8px; }
+    #chess-moves { width:min(86vw, 340px); max-height:120px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.55; }
     #chess-controls { display:flex; gap:8px; width:min(86vw, 340px); }
+    body.chess-mode #game-col-right { display:none !important; }
 
     /* ─── LEADERBOARD PAGE ──────────────────────────────────── */
     #lb-tabs { display: flex; gap: 0; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
@@ -399,6 +400,55 @@
         min-width: 240px;
         display: flex !important; flex-direction: column;
         padding-top: 8px; padding-left: 28px;
+      }
+      body.chess-mode #page-game { justify-content:center; }
+      body.chess-mode #game-col-left {
+        width:min(920px, 100%);
+        border-right:none;
+        padding-right:0;
+        margin:0 auto;
+      }
+      body.chess-mode #game-mode-title {
+        margin:0 auto 14px;
+        color:rgba(255,255,255,0.55);
+      }
+      body.chess-mode #chess-panel:not(.hidden) {
+        display:grid;
+        grid-template-columns:minmax(360px, 520px) minmax(260px, 340px);
+        grid-template-rows:auto auto 1fr;
+        gap:12px 18px;
+        align-items:start;
+        justify-content:center;
+        width:100%;
+      }
+      body.chess-mode #chess-status {
+        grid-column:1 / -1;
+        font-size:18px;
+        background:var(--card);
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:11px 14px;
+        margin:0;
+      }
+      body.chess-mode #chess-board {
+        grid-row:2 / 4;
+        width:min(52vw, 520px);
+        margin:0;
+        border-radius:12px;
+        box-shadow:0 18px 50px rgba(0,0,0,0.28);
+      }
+      body.chess-mode .chess-square { font-size:clamp(34px, 4.7vw, 56px); }
+      body.chess-mode #chess-moves {
+        width:100%;
+        max-height:360px;
+        min-height:260px;
+        margin:0;
+        font-size:14px;
+        color:rgba(255,255,255,0.62);
+      }
+      body.chess-mode #chess-controls {
+        width:100%;
+        margin:0;
       }
 
       /* bigger watch ring on desktop */
@@ -822,7 +872,7 @@
         <div id="chess-panel" class="game-mode-panel hidden">
           <div id="chess-status">White to move</div>
           <div id="chess-board"></div>
-          <div id="chess-moves">No moves yet</div>
+          <div id="chess-moves"><strong>Moves</strong><br>No moves yet</div>
           <div id="chess-controls">
             <button class="game-btn" onclick="resetChessGame()">New game</button>
             <button class="game-btn icon-btn" onclick="flipChessBoard()" title="Flip board">↕</button>
@@ -961,6 +1011,7 @@
     // ── Tab navigation ────────────────────────────────────────
     function switchPage(name) {
       if (name === 'selector') stopGame();
+      if (name === 'lb' && activeGame === 'chess') name = 'game';
       document.body.classList.toggle('selector-mode', name === 'selector');
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -1156,13 +1207,24 @@
     }
 
     function applyActiveGameUi() {
+      document.body.classList.toggle('chess-mode', activeGame === 'chess');
       document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
       document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');
       document.getElementById('chess-panel').classList.toggle('hidden', activeGame !== 'chess');
       document.getElementById('difficulty-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
       document.getElementById('btn-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
       document.getElementById('game-mode-title').textContent = gameConfig().title;
-      if (activeGame === 'chess') initChessGame();
+      if (activeGame === 'chess') {
+        clearChessLeaderboards();
+        initChessGame();
+      }
+    }
+
+    function clearChessLeaderboards() {
+      ['scores', 'scores-inline'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">Chess has no leaderboard</li>';
+      });
     }
 
     // ── Sound ─────────────────────────────────────────────────
@@ -1516,7 +1578,7 @@
       }
       document.getElementById('chess-status').textContent = chessStatusText();
       const history = chessGame.history();
-      document.getElementById('chess-moves').textContent = history.length ? history.join(' ') : 'No moves yet';
+      document.getElementById('chess-moves').innerHTML = '<strong style="color:white;">Moves</strong><br>' + (history.length ? escHtml(history.join(' ')) : 'No moves yet');
     }
 
     function handleChessSquare(square) {
