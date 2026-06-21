@@ -81,7 +81,15 @@
     .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
     .header-action { font-size: 13px; font-weight: 600; color: var(--green); cursor: pointer; background: none; border: none; font-family: inherit; }
 
-    /* ─── GAME PAGE ─────────────────────────────────────────── */
+    /* ─── GAME SELECTOR / GAME PAGE ─────────────────────────── */
+    .selector-grid { display:grid; grid-template-columns:1fr; gap:12px; padding-bottom:20px; }
+    .game-card { text-align:left; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; cursor:pointer; display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:center; }
+    .game-card:active { background:rgba(255,255,255,0.09); }
+    .game-card-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; background:rgba(255,255,255,0.08); }
+    .game-card-title { font-size:17px; font-weight:800; margin-bottom:3px; }
+    .game-card-sub { font-size:12px; color:var(--text-dim); line-height:1.35; }
+    .game-card-meta { grid-column:2; display:flex; gap:6px; flex-wrap:wrap; }
+    .game-pill { font-size:10px; font-weight:700; color:rgba(255,255,255,0.55); background:rgba(255,255,255,0.07); border:1px solid var(--border); border-radius:999px; padding:3px 7px; }
     #page-game { padding-top: 0; }
 
     /* auth bar inside game page */
@@ -147,6 +155,19 @@
 
     #guest-notice { font-size: 12px; color: rgba(255,255,255,0.25); margin: 6px 0 2px; min-height: 16px; }
     #game-col-right { display: none; }
+    .game-mode-panel { width:100%; display:flex; flex-direction:column; align-items:center; }
+    .game-mode-panel.hidden { display:none; }
+    #game-mode-title { font-size:13px; color:var(--text-dim); font-weight:700; letter-spacing:0.03em; text-transform:uppercase; margin-right:auto; margin-bottom:8px; }
+    #aim-board { width:min(84vw, 320px); aspect-ratio:1; border-radius:18px; background:rgba(255,255,255,0.04); border:1px solid var(--border); position:relative; overflow:hidden; margin:4px auto 14px; touch-action:none; }
+    #aim-board.ready { cursor:crosshair; }
+    #aim-board.finished { border-color:rgba(255,215,0,0.28); background:rgba(255,215,0,0.06); }
+    #aim-target { position:absolute; width:58px; height:58px; border-radius:50%; border:3px solid rgba(255,255,255,0.85); background:radial-gradient(circle at 50% 50%, #ff5555 0 22%, #ffd700 23% 42%, #4db8ff 43% 62%, rgba(255,255,255,0.9) 63% 100%); box-shadow:0 10px 26px rgba(0,0,0,0.28); display:none; transform:translate(-50%,-50%); cursor:pointer; }
+    #aim-center { position:absolute; inset:50% auto auto 50%; width:8px; height:8px; border-radius:50%; background:#0a0a0f; transform:translate(-50%,-50%); pointer-events:none; }
+    #aim-target.show { display:block; }
+    #aim-hud { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; width:100%; margin-bottom:10px; }
+    .aim-hud-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px; }
+    .aim-hud-card .val { font-size:18px; font-weight:800; }
+    .aim-hud-card .lbl { font-size:10px; color:var(--text-dim); margin-top:2px; }
 
     /* ─── LEADERBOARD PAGE ──────────────────────────────────── */
     #lb-tabs { display: flex; gap: 0; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
@@ -630,8 +651,41 @@
   <!-- ─── PAGES ──────────────────────────────────────────── -->
   <div id="pages">
 
+    <!-- GAME SELECTOR -->
+    <div id="page-selector" class="page active">
+      <div class="page-header">
+        <span class="page-title">Games</span>
+      </div>
+      <div class="selector-grid">
+        <div class="game-card" onclick="selectGame('reaction')">
+          <div class="game-card-icon">⏱</div>
+          <div>
+            <div class="game-card-title">Reaction Time</div>
+            <div class="game-card-sub">Wait for green, tap fast, build streaks, and chase the fastest leaderboard times.</div>
+          </div>
+          <div class="game-card-meta">
+            <span class="game-pill">Leaderboards</span>
+            <span class="game-pill">Friends</span>
+            <span class="game-pill">Challenges</span>
+          </div>
+        </div>
+        <div class="game-card" onclick="selectGame('aim')">
+          <div class="game-card-icon">◎</div>
+          <div>
+            <div class="game-card-title">Aim Trainer</div>
+            <div class="game-card-sub">Hit every target as quickly as possible. Your score is average milliseconds per target.</div>
+          </div>
+          <div class="game-card-meta">
+            <span class="game-pill">Accuracy</span>
+            <span class="game-pill">Local scores</span>
+            <span class="game-pill">Friends</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- GAME -->
-    <div id="page-game" class="page active">
+    <div id="page-game" class="page">
       <div id="auth-bar">
         <div id="user-info" style="display:none;align-items:center;gap:8px;">
           <img id="user-photo" src="" alt="">
@@ -643,12 +697,14 @@
 
       <!-- left col: tap ring + controls -->
       <div id="game-col-left">
+        <div id="game-mode-title">Reaction Time</div>
         <div id="difficulty-row">
           <button class="diff-btn" onclick="setDifficulty('easy')">Easy</button>
           <button class="diff-btn" onclick="setDifficulty('normal')">Normal</button>
           <button class="diff-btn" onclick="setDifficulty('hard')">Hard</button>
         </div>
 
+        <div id="reaction-panel" class="game-mode-panel">
         <div id="watch-ring-wrap">
           <svg id="watch-svg" viewBox="0 0 296 296" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="148" cy="148" r="140" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
@@ -668,6 +724,20 @@
 
         <div id="reaction-rating"></div>
         <div id="stats-bar" style="margin-bottom:12px;"></div>
+        </div>
+
+        <div id="aim-panel" class="game-mode-panel hidden">
+          <div id="aim-hud">
+            <div class="aim-hud-card"><div class="val" id="aim-hit-count">0/20</div><div class="lbl">Targets</div></div>
+            <div class="aim-hud-card"><div class="val" id="aim-avg">—</div><div class="lbl">Avg</div></div>
+            <div class="aim-hud-card"><div class="val" id="aim-accuracy">100%</div><div class="lbl">Accuracy</div></div>
+          </div>
+          <div id="aim-board" onclick="aimBoardMiss(event)">
+            <div id="aim-target" onclick="hitAimTarget(event)"><span id="aim-center"></span></div>
+          </div>
+          <div id="aim-rating"></div>
+          <div id="aim-stats-bar" style="margin-bottom:12px;"></div>
+        </div>
 
         <div id="btn-row">
           <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
@@ -762,9 +832,9 @@
 
   <!-- ─── BOTTOM TAB BAR ──────────────────────────────────── -->
   <div id="tab-bar">
-    <button class="tab-item active" id="tab-game" onclick="switchPage('game')">
-      <span class="tab-icon">⏱</span>
-      <span class="tab-label">Game</span>
+    <button class="tab-item active" id="tab-selector" onclick="switchPage('selector')">
+      <span class="tab-icon">▦</span>
+      <span class="tab-label">Games</span>
     </button>
     <button class="tab-item" id="tab-lb" onclick="switchPage('lb')">
       <span class="tab-icon">🏆</span>
@@ -799,10 +869,11 @@
 
     // ── Tab navigation ────────────────────────────────────────
     function switchPage(name) {
+      if (name === 'selector') stopGame();
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
       document.getElementById('page-' + name).classList.add('active');
-      document.getElementById('tab-' + name).classList.add('active');
+      document.getElementById('tab-' + name)?.classList.add('active');
       if (name === 'profile') renderProfile();
       if (name === 'friends') renderFriendsPage();
     }
@@ -811,8 +882,35 @@
     let currentUser = null;
     let lbFilter = 'alltime';
     let lbUnsub  = null;
+    let activeGame = localStorage.getItem('activeGame') || 'reaction';
     const GUEST_ID_KEY = 'reactionGuestId';
-    const LOCAL_LB_KEY = 'reactionLocalLeaderboard';
+    const GAME_CONFIG = {
+      reaction: {
+        title: 'Reaction Time',
+        scoreCollection: 'scores',
+        dailyCollection: 'daily',
+        localKey: 'reactionLocalLeaderboard',
+        scoreLabel: value => value + ' ms',
+        rating: ratingFor
+      },
+      aim: {
+        title: 'Aim Trainer',
+        scoreCollection: 'aimScores',
+        dailyCollection: 'aimDaily',
+        localKey: 'aimLocalLeaderboard',
+        scoreLabel: value => value + ' ms avg',
+        rating: aimRatingFor
+      }
+    };
+    if (!GAME_CONFIG[activeGame]) activeGame = 'reaction';
+
+    function gameConfig() {
+      return GAME_CONFIG[activeGame] || GAME_CONFIG.reaction;
+    }
+
+    function gameConfigFor(game) {
+      return GAME_CONFIG[game] || GAME_CONFIG.reaction;
+    }
 
     function getGuestId() {
       let id = localStorage.getItem(GUEST_ID_KEY);
@@ -851,8 +949,7 @@
         document.getElementById('user-photo').src            = user.photoURL || '';
         document.getElementById('guest-notice').textContent  = '';
         closeModal('auth-overlay');
-        const doc = await db.collection('scores').doc(user.uid).get();
-        if (doc.exists) allTimeBest = doc.data().time;
+        await loadActiveBest();
       } else {
         document.getElementById('sign-in-btn').style.display = 'block';
         document.getElementById('user-info').style.display   = 'none';
@@ -923,6 +1020,11 @@
       normal: { minDelay:1500, maxDelay:4500, window:null },
       hard:   { minDelay:800,  maxDelay:3000, window:1200 },
     };
+    const AIM_DIFFICULTY = {
+      easy:   { targets:15, size:66 },
+      normal: { targets:20, size:54 },
+      hard:   { targets:25, size:42 },
+    };
     let difficulty = 'normal';
 
     function setDifficulty(d) {
@@ -930,6 +1032,36 @@
       document.querySelectorAll('.diff-btn').forEach((b,i)=>b.classList.toggle('active',['easy','normal','hard'][i]===d));
     }
     setDifficulty('normal');
+
+    async function loadActiveBest() {
+      if (!currentUser) { allTimeBest = null; return; }
+      try {
+        const doc = await db.collection(gameConfig().scoreCollection).doc(currentUser.uid).get();
+        allTimeBest = doc.exists ? doc.data().time : null;
+      } catch (err) {
+        console.error('Could not load best score:', err);
+        allTimeBest = null;
+      }
+    }
+
+    async function selectGame(game) {
+      if (!GAME_CONFIG[game]) return;
+      stopGame();
+      activeGame = game;
+      localStorage.setItem('activeGame', game);
+      applyActiveGameUi();
+      await loadActiveBest();
+      syncLbTabs();
+      subscribeLeaderboard();
+      switchPage('game');
+      document.getElementById('tab-selector')?.classList.add('active');
+    }
+
+    function applyActiveGameUi() {
+      document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
+      document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');
+      document.getElementById('game-mode-title').textContent = gameConfig().title;
+    }
 
     // ── Sound ─────────────────────────────────────────────────
     let soundOn = true;
@@ -1003,12 +1135,14 @@
     }
 
     function startGame() {
+      if (activeGame === 'aim') { startAimGame(); return; }
       running=true; streak=0; sessionTimes=[];
       setArc(0);
       updateStatsBar(); nextRound();
     }
 
     function stopGame() {
+      if (activeGame === 'aim') { stopAimGame(); return; }
       running=false; waiting=false; ready=false;
       clearTimeout(timeout); clearTimeout(nextRoundTimeout); clearTimeout(windowTimeout);
       setGameState('idle');
@@ -1047,6 +1181,7 @@
     }
 
     function handleTap() {
+      if (activeGame === 'aim') return;
       if (waiting && !ready) {
         clearTimeout(timeout); streak=0;
         setGameState('result'); gameText.textContent='Too early!'; gameSub.textContent='';
@@ -1084,6 +1219,126 @@
         waiting=false; ready=false; updateStatsBar();
         if(running) nextRoundTimeout=setTimeout(nextRound,1400);
       }
+    }
+
+    // ── Aim Trainer ─────────────────────────────────────────────
+    let aimRunning = false;
+    let aimHits = 0;
+    let aimMisses = 0;
+    let aimTargetAt = 0;
+    let aimTimes = [];
+
+    function aimRatingFor(ms) {
+      if (ms < 450) return { label:'⚡ Deadeye', color:'#ff4fc8' };
+      if (ms < 650) return { label:'🎯 Sharp', color:'#00c853' };
+      if (ms < 850) return { label:'👍 Steady', color:'#4db8ff' };
+      if (ms < 1100) return { label:'😐 Warmup', color:'#ffd700' };
+      return { label:'🐢 Slow', color:'#ff5555' };
+    }
+
+    function aimElements() {
+      return {
+        board: document.getElementById('aim-board'),
+        target: document.getElementById('aim-target'),
+        hits: document.getElementById('aim-hit-count'),
+        avg: document.getElementById('aim-avg'),
+        accuracy: document.getElementById('aim-accuracy'),
+        rating: document.getElementById('aim-rating'),
+        stats: document.getElementById('aim-stats-bar')
+      };
+    }
+
+    function startAimGame() {
+      aimRunning = true;
+      aimHits = 0;
+      aimMisses = 0;
+      aimTimes = [];
+      const els = aimElements();
+      els.board.className = 'ready';
+      els.rating.textContent = '';
+      updateAimHud();
+      placeAimTarget();
+    }
+
+    function stopAimGame() {
+      aimRunning = false;
+      const els = aimElements();
+      els.target.classList.remove('show');
+      els.board.className = '';
+      els.stats.textContent = '';
+      els.rating.textContent = '';
+      updateAimHud();
+    }
+
+    function placeAimTarget() {
+      if (!aimRunning) return;
+      const cfg = AIM_DIFFICULTY[difficulty];
+      const els = aimElements();
+      const rect = els.board.getBoundingClientRect();
+      const radius = cfg.size / 2;
+      const x = radius + Math.random() * Math.max(1, rect.width - cfg.size);
+      const y = radius + Math.random() * Math.max(1, rect.height - cfg.size);
+      els.target.style.width = cfg.size + 'px';
+      els.target.style.height = cfg.size + 'px';
+      els.target.style.left = x + 'px';
+      els.target.style.top = y + 'px';
+      els.target.classList.add('show');
+      aimTargetAt = Date.now();
+    }
+
+    function updateAimHud() {
+      const cfg = AIM_DIFFICULTY[difficulty];
+      const els = aimElements();
+      const attempts = aimHits + aimMisses;
+      const avg = aimTimes.length ? Math.round(aimTimes.reduce((a,b)=>a+b,0) / aimTimes.length) : null;
+      const accuracy = attempts ? Math.round((aimHits / attempts) * 100) : 100;
+      els.hits.textContent = aimHits + '/' + cfg.targets;
+      els.avg.textContent = avg ? avg + 'ms' : '—';
+      els.accuracy.textContent = accuracy + '%';
+      els.stats.textContent = aimRunning ? 'Misses: ' + aimMisses : '';
+    }
+
+    function finishAimGame() {
+      aimRunning = false;
+      const els = aimElements();
+      els.target.classList.remove('show');
+      els.board.className = 'finished';
+      const avg = Math.round(aimTimes.reduce((a,b)=>a+b,0) / aimTimes.length);
+      const penalty = aimMisses * 35;
+      const score = avg + penalty;
+      const rating = aimRatingFor(score);
+      const tr = parseInt(localStorage.getItem('totalRounds') || '0') + 1;
+      localStorage.setItem('totalRounds', tr);
+      els.rating.textContent = rating.label;
+      els.rating.style.color = rating.color;
+      els.stats.textContent = 'Score: ' + score + 'ms avg' + (penalty ? ' · +' + penalty + 'ms misses' : '');
+      showRating(score);
+      saveScore(score);
+      checkAchievements();
+      if (currentUser && (allTimeBest === null || score < allTimeBest)) {
+        launchConfetti();
+        haptic('best');
+      }
+    }
+
+    function hitAimTarget(e) {
+      e.stopPropagation();
+      if (!aimRunning) return;
+      const elapsed = Date.now() - aimTargetAt;
+      aimTimes.push(elapsed);
+      aimHits++;
+      playTapSound();
+      haptic('tap');
+      updateAimHud();
+      if (aimHits >= AIM_DIFFICULTY[difficulty].targets) finishAimGame();
+      else placeAimTarget();
+    }
+
+    function aimBoardMiss(e) {
+      if (!aimRunning || e.target.id === 'aim-target') return;
+      aimMisses++;
+      haptic('early');
+      updateAimHud();
     }
 
     // ── Rating ────────────────────────────────────────────────
@@ -1185,7 +1440,7 @@
     // ── Firestore ─────────────────────────────────────────────
     function getLocalLeaderboard() {
       try {
-        return JSON.parse(localStorage.getItem(LOCAL_LB_KEY) || '[]');
+        return JSON.parse(localStorage.getItem(gameConfig().localKey) || '[]');
       } catch (err) {
         console.error('Could not read local leaderboard:', err);
         return [];
@@ -1215,7 +1470,7 @@
         .sort((a, b) => a.time - b.time)
         .slice(0, 10);
 
-      localStorage.setItem(LOCAL_LB_KEY, JSON.stringify(scores));
+      localStorage.setItem(gameConfig().localKey, JSON.stringify(scores));
       if (lbFilter === 'local') renderLocalLeaderboard();
     }
 
@@ -1224,7 +1479,7 @@
       saveLocalScore(time, player);
 
       if (!player.isGuest) {
-        const ref = db.collection('scores').doc(player.id);
+        const ref = db.collection(gameConfig().scoreCollection).doc(player.id);
         const doc = await ref.get();
 
         if (!doc.exists || time < doc.data().time) {
@@ -1239,7 +1494,7 @@
 
       // Guests can compete on Today, but only signed-in users are saved to All Time.
       const today = new Date().toISOString().slice(0,10);
-      const dayRef = db.collection('daily').doc(today).collection('scores').doc(player.id);
+      const dayRef = db.collection(gameConfig().dailyCollection).doc(today).collection('scores').doc(player.id);
       const dayDoc = await dayRef.get();
       if (!dayDoc.exists || time < dayDoc.data().time) {
         await dayRef.set({
@@ -1295,7 +1550,7 @@
           '<span class="rank">'+(i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1))+'</span>'+
           avatar+
           '<span class="lname">'+escHtml(s.name)+youTag+onlineDot+'</span>'+
-          '<span class="ltime">'+s.time+' ms</span>'+
+          '<span class="ltime">'+gameConfig().scoreLabel(s.time)+'</span>'+
           '<span class="lb-chevron">›</span>';
         li.addEventListener('click',()=>openPlayerModal(s, i+1, uid));
         list.appendChild(li);
@@ -1316,8 +1571,8 @@
       }
 
       const query = lbFilter==='alltime'
-        ? db.collection('scores').orderBy('time').limit(10)
-        : db.collection('daily').doc(new Date().toISOString().slice(0,10)).collection('scores').orderBy('time').limit(10);
+        ? db.collection(gameConfig().scoreCollection).orderBy('time').limit(10)
+        : db.collection(gameConfig().dailyCollection).doc(new Date().toISOString().slice(0,10)).collection('scores').orderBy('time').limit(10);
 
       lbUnsub=query.onSnapshot(snapshot=>{
         renderLbSnapshot(snapshot, 'scores');
@@ -1380,8 +1635,8 @@
       else { photo.style.display='none'; }
       document.getElementById('pm-name').textContent  = escHtml(s.name);
       document.getElementById('pm-rank').textContent  = typeof rank === 'number' ? rankLabel(rank) + ' on leaderboard' : rank;
-      document.getElementById('pm-best').textContent  = s.time ? s.time + ' ms' : 'No score';
-      const r = s.time ? ratingFor(s.time) : null;
+      document.getElementById('pm-best').textContent  = s.time ? gameConfig().scoreLabel(s.time) : 'No score';
+      const r = s.time ? gameConfig().rating(s.time) : null;
       document.getElementById('pm-rating').textContent = r ? r.label : '—';
       document.getElementById('pm-rank-stat').textContent = typeof rank === 'number' ? '#' + rank : '—';
       document.getElementById('pm-gap').textContent = scoreGapLabel(s.time, uid);
@@ -1444,7 +1699,7 @@
       }
 
       const times = sessionTimes;
-      const best  = allTimeBest !== null ? allTimeBest + ' ms' : (times.length ? Math.min(...times)+' ms' : '—');
+      const best  = allTimeBest !== null ? gameConfig().scoreLabel(allTimeBest) : (times.length ? gameConfig().scoreLabel(Math.min(...times)) : '—');
       const avg   = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length)+' ms' : '—';
       const worst = times.length ? Math.max(...times)+' ms' : '—';
       const count = localStorage.getItem('totalRounds') || '0';
@@ -1525,7 +1780,7 @@
         await currentUser.updateProfile({ displayName: name });
         // update Firestore score doc with new name
         if (allTimeBest !== null) {
-          await db.collection('scores').doc(currentUser.uid).update({ name });
+          await db.collection(gameConfig().scoreCollection).doc(currentUser.uid).update({ name });
         }
         await db.collection('presence').doc(currentUser.uid).update({ name });
         document.getElementById('profile-name-display').textContent = name;
@@ -1662,7 +1917,7 @@
         listEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add some!</div>';
       } else {
         const uids = [...myFriends];
-        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         listEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
@@ -1675,7 +1930,7 @@
       // render pending incoming requests
       if (pendingEl && pendingIn.size > 0) {
         const uids = [...pendingIn];
-        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         pendingEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
@@ -1690,7 +1945,7 @@
         ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">'
         : '<div class="friend-avatar-ph">👤</div>';
       const onlineDot = online ? ' <span class="online-dot"></span>' : '';
-      const score = data.time ? data.time + ' ms' : 'No score yet';
+      const score = data.time ? gameConfig().scoreLabel(data.time) : 'No score yet';
       let btns = '';
       if (action === 'remove') btns = '<button class="friend-btn remove" onclick="removeFriend(\''+uid+'\');renderFriendsList()">Remove</button>';
       if (action === 'accept') btns =
@@ -1735,6 +1990,7 @@
 
     // ── Live challenge system ─────────────────────────────────
     let activeChallengeId = null;
+    let activeChallengeGame = 'reaction';
     let challengeUnsub = null;
 
     function sendLiveChallenge() {
@@ -1755,6 +2011,7 @@
         from: currentUser.uid,
         fromName: currentUser.displayName || 'Someone',
         fromScore: allTimeBest || null,
+        game: activeGame,
         to: toUid,
         status: 'pending',
         ts: firebase.firestore.FieldValue.serverTimestamp()
@@ -1786,10 +2043,11 @@
 
     function showChallengePopup(docId, data) {
       activeChallengeId = docId;
+      activeChallengeGame = GAME_CONFIG[data.game] ? data.game : 'reaction';
       document.getElementById('cp-name').textContent = escHtml(data.fromName);
       document.getElementById('cp-sub').textContent = data.fromScore
-        ? 'Their best: ' + data.fromScore + ' ms — can you beat it?'
-        : 'wants to race you';
+        ? gameConfigFor(activeChallengeGame).title + ' best: ' + gameConfigFor(activeChallengeGame).scoreLabel(data.fromScore)
+        : 'wants to play ' + gameConfigFor(activeChallengeGame).title;
       document.getElementById('challenge-popup').classList.add('show');
       haptic('go');
 
@@ -1798,11 +2056,16 @@
       window._challengeAutoDecline = setTimeout(() => declineChallenge(), 20000);
     }
 
-    function acceptChallenge() {
+    async function acceptChallenge() {
       clearTimeout(window._challengeAutoDecline);
       if (!activeChallengeId) return;
       db.collection('challenges').doc(activeChallengeId).update({ status: 'accepted' });
       document.getElementById('challenge-popup').classList.remove('show');
+      activeGame = activeChallengeGame;
+      localStorage.setItem('activeGame', activeGame);
+      applyActiveGameUi();
+      await loadActiveBest();
+      subscribeLeaderboard();
       startChallengeCountdown();
       activeChallengeId = null;
     }
@@ -1819,6 +2082,12 @@
     function startChallengeCountdown() {
       // stop any current game, start a fresh one with a 3-2-1 countdown
       stopGame();
+      if (activeGame === 'aim') {
+        switchPage('game');
+        document.getElementById('tab-selector')?.classList.add('active');
+        startGame();
+        return;
+      }
       let count = 3;
       setGameState('wait');
       const ringEl2 = document.getElementById('watch-ring');
@@ -1840,6 +2109,7 @@
       }, 1000);
       // switch to game tab
       switchPage('game');
+      document.getElementById('tab-selector')?.classList.add('active');
     }
 
     // ── Online presence ──────────────────────────────────────────
@@ -2074,7 +2344,7 @@
       if (onlineFriends.length === 0) {
         onlineEl.innerHTML = '<div class="friends-empty">None of your friends are online right now</div>';
       } else {
-        const snaps = await Promise.all(onlineFriends.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(onlineFriends.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         onlineEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = onlineFriends[i];
@@ -2087,7 +2357,7 @@
       const incomingEl = document.getElementById('friends-page-incoming');
       if (pendingIn.size > 0) {
         const uids = [...pendingIn];
-        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         incomingEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
@@ -2109,7 +2379,7 @@
       const outgoingEl = document.getElementById('friends-page-outgoing');
       if (pendingOut.size > 0) {
         const uids = [...pendingOut];
-        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         outgoingEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
@@ -2133,7 +2403,7 @@
         allEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add someone!</div>';
       } else {
         const uids = [...myFriends];
-        const snaps = await Promise.all(uids.map(uid => db.collection('scores').doc(uid).get()));
+        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
         allEl.innerHTML = '';
         snaps.forEach((doc, i) => {
           const uid = uids[i];
@@ -2146,7 +2416,7 @@
     function friendPageItemHtml(uid, data, online) {
       const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
       const onlineDot = online ? ' <span class="online-dot"></span>' : '';
-      const score = data.time ? data.time + ' ms' : 'No score yet';
+      const score = data.time ? gameConfig().scoreLabel(data.time) : 'No score yet';
       const rank = myFriends.has(uid) ? 'Friend' : 'Player';
       const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
       const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
@@ -2198,7 +2468,7 @@
           el.insertAdjacentHTML('beforeend',
             '<div class="friend-item">'+avatar+
             '<div class="friend-info"><div class="friend-name">'+escHtml(p.name)+onlineDot+'</div>'+
-            '<div class="friend-sub">'+(p.time?p.time+' ms':'No score yet')+'</div></div>'+
+            '<div class="friend-sub">'+(p.time?gameConfig().scoreLabel(p.time):'No score yet')+'</div></div>'+
             btn+'</div>');
         });
       }, 350);
@@ -2292,7 +2562,7 @@
       const q = query.trim().toLowerCase();
       if (!q) return [];
       // search leaderboard scores collection for matching names
-      const snap = await db.collection('scores').get();
+      const snap = await db.collection(gameConfig().scoreCollection).get();
       return snap.docs
         .filter(d => d.id !== currentUser?.uid && d.data().name?.toLowerCase().includes(q))
         .slice(0, 8)
@@ -2309,7 +2579,7 @@
         return;
       }
       const uids = [...myFriends, currentUser.uid].slice(0, 10);
-      db.collection('scores').where(firebase.firestore.FieldPath.documentId(), 'in', uids).orderBy('time').get().then(snap => {
+      db.collection(gameConfig().scoreCollection).where(firebase.firestore.FieldPath.documentId(), 'in', uids).orderBy('time').get().then(snap => {
         if (snap.empty) {
           listIds.forEach(id => {
             const el = document.getElementById(id);
@@ -2327,6 +2597,10 @@
       if(e.key==='Escape'){ ['auth-overlay','player-overlay','mp-overlay','challenge-overlay'].forEach(closeModal); declineChallenge(); return; }
       if((e.key==='Enter'||e.key===' ')&&document.getElementById('page-game').classList.contains('active')){
         e.preventDefault();
+        if (activeGame === 'aim') {
+          if (!aimRunning) startGame();
+          return;
+        }
         if(!running) startGame(); else handleTap();
       }
     });
