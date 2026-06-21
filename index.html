@@ -1915,6 +1915,61 @@
       return entries.sort((a, b) => b[1] - a[1])[0][0];
     }
 
+    function getProfilePlayCounts(profile) {
+      const counts = Object.assign({ reaction: 0, aim: 0, chess: 0 }, profile?.gamePlays || {});
+      return counts;
+    }
+
+    function totalProfilePlays(profile) {
+      const counts = getProfilePlayCounts(profile);
+      return Object.values(counts).reduce((sum, value) => sum + (Number(value) || 0), 0) + getWatchCpsPlays();
+    }
+
+    function formatCpsBest() {
+      const raw = parseFloat(localStorage.getItem('watchCpsBest') || '0');
+      if (!raw) return '—';
+      return (Math.round(raw * 10) / 10).toFixed(raw % 1 === 0 ? 0 : 1) + ' CPS';
+    }
+
+    function getWatchCpsPlays() {
+      return parseInt(localStorage.getItem('watchCpsPlays') || '0', 10) || 0;
+    }
+
+    function profileGameRows(profile, statsByGame) {
+      const counts = getProfilePlayCounts(profile);
+      const rows = [
+        {
+          label: 'Reaction Time',
+          value: statsByGame.reaction.best !== null ? gameConfigFor('reaction').scoreLabel(statsByGame.reaction.best) : 'No score',
+          meta: counts.reaction ? counts.reaction + ' plays' : 'No plays'
+        },
+        {
+          label: 'Aim Trainer',
+          value: statsByGame.aim.best !== null ? gameConfigFor('aim').scoreLabel(statsByGame.aim.best) : 'No score',
+          meta: counts.aim ? counts.aim + ' plays' : 'No plays'
+        },
+        {
+          label: 'Chess',
+          value: counts.chess ? counts.chess + ' plays' : 'No plays',
+          meta: 'No leaderboard'
+        },
+        {
+          label: 'Watch CPS',
+          value: statsByGame.cps.best,
+          meta: getWatchCpsPlays() ? getWatchCpsPlays() + ' plays' : 'Watch only'
+        }
+      ];
+      return rows.map(row => (
+        '<div class="player-detail-row">'+
+          '<span>'+escHtml(row.label)+'</span>'+
+          '<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">'+
+            '<span>'+escHtml(row.value)+'</span>'+
+            '<span style="color:var(--text-dim);font-size:11px;font-weight:500;">'+escHtml(row.meta)+'</span>'+
+          '</span>'+
+        '</div>'
+      )).join('');
+    }
+
     async function recordGamePlay(game) {
       const player = getPlayerInfo();
       if (player.isGuest) return;
@@ -2205,7 +2260,7 @@
     }
 
     // ── Profile page ──────────────────────────────────────────
-    function renderProfile() {
+    async function renderProfile() {
       const el = document.getElementById('profile-content');
       if (!currentUser) {
         el.innerHTML = '<div style="padding:30px 0;color:var(--text-dim);font-size:15px;">Sign in to see your profile</div>' +
@@ -2213,16 +2268,30 @@
         return;
       }
 
-      const times = sessionTimes;
-      const best  = allTimeBest !== null ? gameConfig().scoreLabel(allTimeBest) : (times.length ? gameConfig().scoreLabel(Math.min(...times)) : '—');
-      const avg   = times.length ? Math.round(times.reduce((a,b)=>a+b,0)/times.length)+' ms' : '—';
-      const worst = times.length ? Math.max(...times)+' ms' : '—';
-      const count = localStorage.getItem('totalRounds') || '0';
-      const rating = allTimeBest ? (ratingFor(allTimeBest)||{label:'—'}).label : '—';
-
       const avatarHtml = currentUser.photoURL
         ? '<img class="profile-avatar" src="'+currentUser.photoURL+'" alt="" referrerpolicy="no-referrer">'
         : '<div class="profile-avatar-placeholder">👤</div>';
+
+      const profileSnap = await db.collection('profiles').doc(currentUser.uid).get().catch(() => null);
+      const profileData = profileSnap?.exists ? profileSnap.data() : {};
+      const counts = getProfilePlayCounts(profileData);
+      const statsByGame = {
+        reaction: { best: null },
+        aim: { best: null },
+        cps: { best: formatCpsBest() }
+      };
+      const [reactionSnap, aimSnap] = await Promise.all([
+        db.collection('scores').doc(currentUser.uid).get().catch(() => null),
+        db.collection('aimScores').doc(currentUser.uid).get().catch(() => null)
+      ]);
+      statsByGame.reaction.best = reactionSnap?.exists ? reactionSnap.data().time : null;
+      statsByGame.aim.best = aimSnap?.exists ? aimSnap.data().time : null;
+
+      const totalPlays = totalProfilePlays(profileData);
+      const mostPlayed = profileData.mostPlayedGame || mostPlayedGameFromProfile(profileData);
+      const reactionBest = statsByGame.reaction.best !== null ? gameConfigFor('reaction').scoreLabel(statsByGame.reaction.best) : '—';
+      const aimBest = statsByGame.aim.best !== null ? gameConfigFor('aim').scoreLabel(statsByGame.aim.best) : '—';
+      const chessPlays = counts.chess || 0;
 
       // achievements
       checkAchievements();
@@ -2248,12 +2317,13 @@
         '</div>'+
         '<div class="profile-sub">'+escHtml(currentUser.email||'')+'</div>'+
         '<div class="stats-grid">'+
-          '<div class="stat-card highlight"><div class="stat-val">'+best+'</div><div class="stat-lbl">All-time best</div></div>'+
-          '<div class="stat-card"><div class="stat-val">'+rating+'</div><div class="stat-lbl">Rating</div></div>'+
-          '<div class="stat-card"><div class="stat-val">'+avg+'</div><div class="stat-lbl">Session avg</div></div>'+
-          '<div class="stat-card"><div class="stat-val">'+count+'</div><div class="stat-lbl">Total rounds</div></div>'+
+          '<div class="stat-card highlight"><div class="stat-val">'+escHtml(mostPlayed)+'</div><div class="stat-lbl">Most played</div></div>'+
+          '<div class="stat-card"><div class="stat-val">'+totalPlays+'</div><div class="stat-lbl">Total plays</div></div>'+
+          '<div class="stat-card"><div class="stat-val">'+escHtml(reactionBest)+'</div><div class="stat-lbl">Reaction best</div></div>'+
+          '<div class="stat-card"><div class="stat-val">'+escHtml(aimBest)+'</div><div class="stat-lbl">Aim best</div></div>'+
         '</div>'+
-        (times.length ? '<div class="chart-label">Last 10 reaction times</div><canvas id="mini-chart" height="65" style="width:100%;"></canvas>' : '')+
+        '<div class="profile-section-title">Game overview</div>'+
+        '<div class="player-detail-list">'+profileGameRows(profileData, statsByGame)+'</div>'+
         '<div class="profile-section-title">Friends</div>'+
         '<div class="friends-search-row">'+
           '<input class="friends-search-input" id="friend-search-input" placeholder="Search by display name..." maxlength="30" oninput="onFriendSearch(this.value)">'+
@@ -2267,8 +2337,6 @@
         '<div class="profile-section-title" style="margin-top:16px;">Achievements</div>'+
         '<div class="achieve-grid">'+achieveHtml+'</div>'+
         '<div class="sign-out-row"><button class="modal-close" onclick="signOut()">Sign out</button></div>';
-
-      if (times.length) setTimeout(()=>drawChart(times.slice(-10)),50);
       setTimeout(renderFriendsList, 50);
     }
 
@@ -3352,6 +3420,7 @@
         wRushRunning = false;
         const cps = (wRushCount / 10).toFixed(1);
         const best = parseFloat(localStorage.getItem('watchCpsBest') || '0');
+        localStorage.setItem('watchCpsPlays', String(getWatchCpsPlays() + 1));
         if (parseFloat(cps) > best) localStorage.setItem('watchCpsBest', cps);
         document.getElementById('w-rush-button').textContent = cps;
         document.getElementById('w-rush-info').textContent = (parseFloat(cps) > best ? 'New best' : 'Done') + ' CPS · ' + wRushCount + ' taps';
