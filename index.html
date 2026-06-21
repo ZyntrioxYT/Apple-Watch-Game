@@ -672,6 +672,7 @@
         <div id="lb-tabs-inline" style="display:flex;gap:0;background:var(--card);border-radius:12px;padding:3px;margin-bottom:12px;">
           <button class="lb-tab active" id="lb2-tab-alltime" onclick="setLbFilter('alltime');syncLbTabs()">All Time</button>
           <button class="lb-tab" id="lb2-tab-today" onclick="setLbFilter('today');syncLbTabs()">Today</button>
+          <button class="lb-tab" id="lb2-tab-local" onclick="setLbFilter('local');syncLbTabs()">Local</button>
         </div>
         <ol id="scores-inline" style="list-style:none;display:flex;flex-direction:column;gap:7px;"></ol>
         <div style="margin-top:12px;">
@@ -689,6 +690,7 @@
       <div id="lb-tabs">
         <button class="lb-tab active" id="lb-tab-alltime" onclick="setLbFilter('alltime')">All Time</button>
         <button class="lb-tab" id="lb-tab-today" onclick="setLbFilter('today')">Today</button>
+        <button class="lb-tab" id="lb-tab-local" onclick="setLbFilter('local')">Local</button>
         <button class="lb-tab" id="lb-tab-friends" onclick="setLbFilter('friends')">Friends</button>
       </div>
       <ol id="scores"><li id="lb-empty">Loading...</li></ol>
@@ -794,6 +796,7 @@
     let lbFilter = 'alltime';
     let lbUnsub  = null;
     const GUEST_ID_KEY = 'reactionGuestId';
+    const LOCAL_LB_KEY = 'reactionLocalLeaderboard';
 
     function getGuestId() {
       let id = localStorage.getItem(GUEST_ID_KEY);
@@ -1164,8 +1167,36 @@
     }
 
     // ── Firestore ─────────────────────────────────────────────
+    function getLocalLeaderboard() {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_LB_KEY) || '[]');
+      } catch (err) {
+        console.error('Could not read local leaderboard:', err);
+        return [];
+      }
+    }
+
+    function saveLocalScore(time, player) {
+      const entry = {
+        id: player.id + '-' + Date.now(),
+        uid: player.id,
+        name: player.name,
+        photoURL: player.photoURL || '',
+        time,
+        timestamp: new Date().toISOString()
+      };
+      const scores = getLocalLeaderboard()
+        .concat(entry)
+        .sort((a, b) => a.time - b.time)
+        .slice(0, 10);
+
+      localStorage.setItem(LOCAL_LB_KEY, JSON.stringify(scores));
+      if (lbFilter === 'local') renderLocalLeaderboard();
+    }
+
     async function saveScore(time) {
       const player = getPlayerInfo();
+      saveLocalScore(time, player);
 
       if (!player.isGuest) {
         const ref = db.collection('scores').doc(player.id);
@@ -1198,16 +1229,25 @@
     // ── Leaderboard ───────────────────────────────────────────
     function setLbFilter(f) {
       lbFilter=f;
-      document.getElementById('lb-tab-alltime').classList.toggle('active',f==='alltime');
-      document.getElementById('lb-tab-today').classList.toggle('active',f==='today');
+      syncLbTabs();
       subscribeLeaderboard();
     }
 
     function syncLbTabs() {
-      ['alltime','today','friends'].forEach(f => {
+      ['alltime','today','local','friends'].forEach(f => {
         document.getElementById('lb-tab-'+f)?.classList.toggle('active', f===lbFilter);
         document.getElementById('lb2-tab-'+f)?.classList.toggle('active', f===lbFilter);
       });
+    }
+
+    function renderLocalLeaderboard() {
+      const docs = getLocalLeaderboard().map(score => ({
+        id: score.uid || score.id,
+        data: () => score
+      }));
+      const snapshot = { empty: docs.length === 0, docs };
+      renderLbSnapshot(snapshot, 'scores');
+      renderLbSnapshot(snapshot, 'scores-inline');
     }
 
     function renderLbSnapshot(snapshot, listId) {
@@ -1242,6 +1282,11 @@
 
       if (lbFilter === 'friends') {
         subscribeFriendsLeaderboard(['scores', 'scores-inline']);
+        return;
+      }
+
+      if (lbFilter === 'local') {
+        renderLocalLeaderboard();
         return;
       }
 
