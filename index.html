@@ -249,14 +249,16 @@
     .player-modal-avatar { width: 60px; height: 60px; border-radius: 50%; margin: 0 auto 10px; border: 2px solid var(--border); display: block; }
     .player-modal-name   { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
     .player-modal-sub    { font-size: 13px; color: var(--text-dim); margin-bottom: 18px; }
-    .player-stats-row    { display: flex; gap: 8px; margin-bottom: 8px; }
-    .player-stat         { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
-    .player-stat .val    { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; }
+    .player-stats-row    { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+    .player-stat         { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; min-width:0; }
+    .player-stat .val    { font-size: 20px; font-weight: 800; letter-spacing: 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .player-stat .lbl    { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
     .player-detail-list  { display:flex; flex-direction:column; gap:7px; margin:8px 0 12px; }
     .player-detail-row   { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px 11px; font-size:12px; }
     .player-detail-row span:first-child { color:var(--text-dim); font-weight:600; }
     .player-detail-row span:last-child  { color:white; font-weight:700; text-align:right; }
+    .player-detail-row.extra { display:none; }
+    .player-detail-row.extra.show { display:flex; }
 
     /* multiplayer modal */
     .mp-scores { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -569,11 +571,25 @@
           <div class="val" id="pm-rating">—</div>
           <div class="lbl">Rating</div>
         </div>
+        <div class="player-stat">
+          <div class="val" id="pm-rank-stat">—</div>
+          <div class="lbl">Rank</div>
+        </div>
+        <div class="player-stat">
+          <div class="val" id="pm-gap">—</div>
+          <div class="lbl">Vs you</div>
+        </div>
       </div>
       <div class="player-detail-list">
+        <div class="player-detail-row"><span>Leaderboard</span><span id="pm-source">—</span></div>
         <div class="player-detail-row"><span>Status</span><span id="pm-status">—</span></div>
         <div class="player-detail-row"><span>Friend status</span><span id="pm-friend-status">—</span></div>
+        <div class="player-detail-row"><span>Challenge</span><span id="pm-challenge-status">—</span></div>
         <div class="player-detail-row"><span>Last best</span><span id="pm-last-best">—</span></div>
+        <div class="player-detail-row extra" id="pm-local-rank-row"><span>Local rank</span><span id="pm-local-rank">—</span></div>
+        <div class="player-detail-row extra" id="pm-rounds-row"><span>Rounds played</span><span id="pm-rounds">—</span></div>
+        <div class="player-detail-row extra" id="pm-streak-row"><span>Best streak</span><span id="pm-streak">—</span></div>
+        <div class="player-detail-row"><span>Player ID</span><span id="pm-player-id">—</span></div>
       </div>
       <button id="pm-challenge-btn" class="friend-btn challenge" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:8px;display:none;" onclick="sendLiveChallenge()">⚡ Challenge</button>
       <button id="pm-friend-btn" class="friend-btn add" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:10px;display:none;" onclick="pmFriendAction()"></button>
@@ -1319,6 +1335,36 @@
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    function leaderboardLabel() {
+      if (lbFilter === 'alltime') return 'All Time';
+      if (lbFilter === 'today') return 'Today';
+      if (lbFilter === 'local') return 'Local';
+      if (lbFilter === 'friends') return 'Friends';
+      return 'Leaderboard';
+    }
+
+    function scoreGapLabel(score, uid) {
+      const myId = getPlayerInfo().id;
+      const localBest = getLocalLeaderboard().find(row => (row.uid || row.id) === myId)?.time || null;
+      const myBest = allTimeBest !== null ? allTimeBest : localBest;
+      if (!score || !myBest) return '—';
+      if (uid === myId) return 'You';
+      const diff = score - myBest;
+      if (diff === 0) return 'Tied';
+      return Math.abs(diff) + ' ms ' + (diff < 0 ? 'faster' : 'slower');
+    }
+
+    function localRankFor(uid) {
+      const rank = getLocalLeaderboard().findIndex(row => (row.uid || row.id) === uid);
+      return rank >= 0 ? '#' + (rank + 1) : 'Not ranked';
+    }
+
+    function challengeStatusLabel(uid) {
+      if (!currentUser || !uid || uid === currentUser.uid) return 'Unavailable';
+      if (!myFriends.has(uid)) return 'Friends only';
+      return onlineUsers.has(uid) ? 'Ready' : 'Offline';
+    }
+
     function friendStatusLabel(uid) {
       if (!currentUser || !uid || uid === currentUser.uid) return 'You';
       if (myFriends.has(uid)) return 'Friend';
@@ -1337,9 +1383,24 @@
       document.getElementById('pm-best').textContent  = s.time ? s.time + ' ms' : 'No score';
       const r = s.time ? ratingFor(s.time) : null;
       document.getElementById('pm-rating').textContent = r ? r.label : '—';
+      document.getElementById('pm-rank-stat').textContent = typeof rank === 'number' ? '#' + rank : '—';
+      document.getElementById('pm-gap').textContent = scoreGapLabel(s.time, uid);
+      document.getElementById('pm-source').textContent = leaderboardLabel();
       document.getElementById('pm-status').textContent = onlineUsers.has(uid) ? 'Online now' : 'Offline';
       document.getElementById('pm-friend-status').textContent = friendStatusLabel(uid);
+      document.getElementById('pm-challenge-status').textContent = challengeStatusLabel(uid);
       document.getElementById('pm-last-best').textContent = formatScoreTimestamp(s.timestamp);
+      document.getElementById('pm-player-id').textContent = uid ? uid.slice(0, 8) : '—';
+
+      const localRank = localRankFor(uid);
+      document.getElementById('pm-local-rank').textContent = localRank;
+      document.getElementById('pm-local-rank-row').classList.toggle('show', localRank !== 'Not ranked');
+
+      const isMe = uid === getPlayerInfo().id;
+      document.getElementById('pm-rounds').textContent = localStorage.getItem('totalRounds') || '0';
+      document.getElementById('pm-streak').textContent = localStorage.getItem('maxStreak') || '0';
+      document.getElementById('pm-rounds-row').classList.toggle('show', isMe);
+      document.getElementById('pm-streak-row').classList.toggle('show', isMe);
 
       // challenge button — only if online friend
       const cbtn = document.getElementById('pm-challenge-btn');
