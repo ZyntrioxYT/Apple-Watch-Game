@@ -2160,9 +2160,7 @@
     // Activates when screen width ≤ 220px (Watch screen sizes: 38mm=136px, 40mm=162px, 44mm=184px, 49mm=205px)
     const watchEl = document.getElementById('watch-ui');
 
-  function isWatch() {
-  return window.innerWidth >= 450 && window.innerHeight >= 450;
-}
+  function isWatch() { return window.innerWidth <= 350; }
 
     function initWatchUI() {
       if (!isWatch()) return;
