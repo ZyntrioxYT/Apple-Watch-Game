@@ -512,6 +512,9 @@
     #w-aim-target.show { display:block; }
     #w-aim-info { font-size:11px; font-weight:800; min-height:14px; }
     #w-aim-sub { font-size:9px; color:rgba(255,255,255,0.45); min-height:12px; margin-top:2px; }
+    #w-rush-section { display:none; width:100%; height:100%; padding:12px; flex-direction:column; justify-content:center; align-items:center; }
+    #w-rush-button { width:min(70vw,120px); aspect-ratio:1; border-radius:50%; border:2px solid rgba(255,255,255,0.12); background:rgba(77,184,255,0.18); color:white; font-size:24px; font-weight:900; font-family:inherit; }
+    #w-rush-info { font-size:11px; color:rgba(255,255,255,0.55); margin-top:8px; min-height:14px; }
 
     /* challenge */
     #challenge-link-box { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 13px; color: rgba(255,255,255,0.6); font-size: 12px; padding: 11px 13px; margin-bottom: 11px; word-break: break-all; text-align: left; font-family: inherit; }
@@ -528,6 +531,7 @@
       <div class="w-select-title">Games</div>
       <button class="w-game-choice" onclick="wSelectGame('reaction')"><strong>⏱ Reaction</strong><span>Tap when green</span></button>
       <button class="w-game-choice" onclick="wSelectGame('aim')"><strong>◎ Aim</strong><span>Hit 10 targets</span></button>
+      <button class="w-game-choice" onclick="wSelectGame('rush')"><strong>✦ Tap Rush</strong><span>Watch only</span></button>
     </div>
 
     <!-- Page dots -->
@@ -552,6 +556,11 @@
       <div id="w-aim-info">Tap Start</div>
       <div id="w-aim-sub"></div>
       <button id="w-aim-start" onclick="wAimStart()">Start</button>
+    </div>
+
+    <div id="w-rush-section">
+      <button id="w-rush-button" onclick="wRushTap()">Start</button>
+      <div id="w-rush-info"></div>
     </div>
 
     <!-- Leaderboard section -->
@@ -634,6 +643,7 @@
         <div class="player-detail-row"><span>Status</span><span id="pm-status">—</span></div>
         <div class="player-detail-row"><span>Friend status</span><span id="pm-friend-status">—</span></div>
         <div class="player-detail-row"><span>Challenge</span><span id="pm-challenge-status">—</span></div>
+        <div class="player-detail-row"><span>Most played</span><span id="pm-most-played">—</span></div>
         <div class="player-detail-row"><span>Last best</span><span id="pm-last-best">—</span></div>
         <div class="player-detail-row extra" id="pm-local-rank-row"><span>Local rank</span><span id="pm-local-rank">—</span></div>
         <div class="player-detail-row extra" id="pm-rounds-row"><span>Rounds played</span><span id="pm-rounds">—</span></div>
@@ -1503,9 +1513,55 @@
       if (lbFilter === 'local') renderLocalLeaderboard();
     }
 
+    function mostPlayedGameFromProfile(profile) {
+      const counts = profile?.gamePlays || {};
+      const reaction = counts.reaction || 0;
+      const aim = counts.aim || 0;
+      if (!reaction && !aim) return '—';
+      return reaction >= aim ? 'Reaction Time' : 'Aim Trainer';
+    }
+
+    async function savePlayerProfile(player) {
+      if (player.isGuest) return null;
+      const ref = db.collection('profiles').doc(player.id);
+      const snap = await ref.get().catch(() => null);
+      const current = snap?.exists ? snap.data() : {};
+      const gamePlays = Object.assign({ reaction: 0, aim: 0 }, current.gamePlays || {});
+      gamePlays[activeGame] = (gamePlays[activeGame] || 0) + 1;
+      const profile = {
+        uid: player.uid,
+        name: player.name,
+        photoURL: player.photoURL || '',
+        gamePlays,
+        mostPlayedGame: mostPlayedGameFromProfile({ gamePlays }),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await ref.set(profile, { merge: true }).catch(err => console.error('Profile save failed:', err));
+      return profile;
+    }
+
+    async function getPlayerCardData(uid) {
+      const [profileSnap, scoreSnap] = await Promise.all([
+        db.collection('profiles').doc(uid).get().catch(() => null),
+        db.collection(gameConfig().scoreCollection).doc(uid).get().catch(() => null)
+      ]);
+      const profile = profileSnap?.exists ? profileSnap.data() : {};
+      const score = scoreSnap?.exists ? scoreSnap.data() : {};
+      return {
+        uid,
+        name: score.name || profile.name || 'Unknown',
+        photoURL: score.photoURL || profile.photoURL || '',
+        time: score.time || null,
+        timestamp: score.timestamp || null,
+        gamePlays: profile.gamePlays || {},
+        mostPlayedGame: profile.mostPlayedGame || mostPlayedGameFromProfile(profile)
+      };
+    }
+
     async function saveScore(time) {
       const player = getPlayerInfo();
       saveLocalScore(time, player);
+      const profile = await savePlayerProfile(player);
 
       if (!player.isGuest) {
         const ref = db.collection(gameConfig().scoreCollection).doc(player.id);
@@ -1516,6 +1572,7 @@
           await ref.set({
             uid: player.uid, name: player.name,
             photoURL: player.photoURL, time,
+            mostPlayedGame: profile?.mostPlayedGame || null,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
@@ -1673,8 +1730,17 @@
       document.getElementById('pm-status').textContent = onlineUsers.has(uid) ? 'Online now' : 'Offline';
       document.getElementById('pm-friend-status').textContent = friendStatusLabel(uid);
       document.getElementById('pm-challenge-status').textContent = challengeStatusLabel(uid);
+      document.getElementById('pm-most-played').textContent = s.mostPlayedGame || mostPlayedGameFromProfile(s);
       document.getElementById('pm-last-best').textContent = formatScoreTimestamp(s.timestamp);
       document.getElementById('pm-player-id').textContent = uid ? uid.slice(0, 8) : '—';
+
+      if (uid) {
+        db.collection('profiles').doc(uid).get().then(profileDoc => {
+          if (!profileDoc.exists || pmCurrentUid !== uid) return;
+          const profile = profileDoc.data();
+          document.getElementById('pm-most-played').textContent = profile.mostPlayedGame || mostPlayedGameFromProfile(profile);
+        }).catch(() => {});
+      }
 
       const localRank = localRankFor(uid);
       document.getElementById('pm-local-rank').textContent = localRank;
@@ -1811,6 +1877,11 @@
         if (allTimeBest !== null) {
           await db.collection(gameConfig().scoreCollection).doc(currentUser.uid).update({ name });
         }
+        await db.collection('profiles').doc(currentUser.uid).set({
+          name,
+          photoURL: currentUser.photoURL || '',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
         await db.collection('presence').doc(currentUser.uid).update({ name });
         document.getElementById('profile-name-display').textContent = name;
         document.getElementById('user-name').textContent = name;
@@ -1946,11 +2017,10 @@
         listEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add some!</div>';
       } else {
         const uids = [...myFriends];
-        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(uids.map(uid => getPlayerCardData(uid)));
         listEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = uids[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           const online = onlineUsers.has(uid);
           listEl.insertAdjacentHTML('beforeend', friendItemHtml(uid, data, 'remove', online));
         });
@@ -1959,11 +2029,10 @@
       // render pending incoming requests
       if (pendingEl && pendingIn.size > 0) {
         const uids = [...pendingIn];
-        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(uids.map(uid => getPlayerCardData(uid)));
         pendingEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = uids[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           pendingEl.insertAdjacentHTML('beforeend', friendItemHtml(uid, data, 'accept'));
         });
       }
@@ -2374,11 +2443,10 @@
       if (onlineFriends.length === 0) {
         onlineEl.innerHTML = '<div class="friends-empty">None of your friends are online right now</div>';
       } else {
-        const snaps = await Promise.all(onlineFriends.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(onlineFriends.map(uid => getPlayerCardData(uid)));
         onlineEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = onlineFriends[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           onlineEl.insertAdjacentHTML('beforeend', friendPageItemHtml(uid, data, true));
         });
       }
@@ -2387,11 +2455,10 @@
       const incomingEl = document.getElementById('friends-page-incoming');
       if (pendingIn.size > 0) {
         const uids = [...pendingIn];
-        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(uids.map(uid => getPlayerCardData(uid)));
         incomingEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = uids[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
           incomingEl.insertAdjacentHTML('beforeend',
             '<div class="friend-item">'+avatar+
@@ -2409,11 +2476,10 @@
       const outgoingEl = document.getElementById('friends-page-outgoing');
       if (pendingOut.size > 0) {
         const uids = [...pendingOut];
-        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(uids.map(uid => getPlayerCardData(uid)));
         outgoingEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = uids[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           const avatar = data.photoURL ? '<img src="'+escHtml(data.photoURL)+'" referrerpolicy="no-referrer">' : '<div class="friend-avatar-ph">👤</div>';
           outgoingEl.insertAdjacentHTML('beforeend',
             '<div class="friend-item">'+avatar+
@@ -2433,11 +2499,10 @@
         allEl.innerHTML = '<div class="friends-empty">No friends yet — search above to add someone!</div>';
       } else {
         const uids = [...myFriends];
-        const snaps = await Promise.all(uids.map(uid => db.collection(gameConfig().scoreCollection).doc(uid).get()));
+        const players = await Promise.all(uids.map(uid => getPlayerCardData(uid)));
         allEl.innerHTML = '';
-        snaps.forEach((doc, i) => {
+        players.forEach((data, i) => {
           const uid = uids[i];
-          const data = doc.exists ? doc.data() : { name: 'Unknown', photoURL: '' };
           allEl.insertAdjacentHTML('beforeend', friendPageItemHtml(uid, data, onlineUsers.has(uid)));
         });
       }
@@ -2591,12 +2656,23 @@
     async function searchPlayers(query) {
       const q = query.trim().toLowerCase();
       if (!q) return [];
-      // search leaderboard scores collection for matching names
-      const snap = await db.collection(gameConfig().scoreCollection).get();
-      return snap.docs
-        .filter(d => d.id !== currentUser?.uid && d.data().name?.toLowerCase().includes(q))
-        .slice(0, 8)
-        .map(d => ({ uid: d.id, ...d.data() }));
+      const byUid = new Map();
+      const addDocs = snap => {
+        snap.docs.forEach(d => {
+          if (d.id === currentUser?.uid) return;
+          const data = d.data();
+          if (!data.name?.toLowerCase().includes(q)) return;
+          byUid.set(d.id, Object.assign({ uid: d.id }, byUid.get(d.id) || {}, data));
+        });
+      };
+
+      const snaps = await Promise.all([
+        db.collection('profiles').get().catch(() => ({ docs: [] })),
+        db.collection('scores').get().catch(() => ({ docs: [] })),
+        db.collection('aimScores').get().catch(() => ({ docs: [] }))
+      ]);
+      snaps.forEach(addDocs);
+      return [...byUid.values()].slice(0, 8);
     }
 
     // ── Friends leaderboard ───────────────────────────────────
@@ -2671,14 +2747,16 @@
 
     function wSelectGame(game) {
       activeGame = game === 'aim' ? 'aim' : 'reaction';
-      localStorage.setItem('activeGame', activeGame);
+      if (game !== 'rush') localStorage.setItem('activeGame', activeGame);
       document.getElementById('w-selector-section').style.display = 'none';
-      document.getElementById('w-dots').style.display = activeGame === 'reaction' ? 'flex' : 'none';
-      document.getElementById('w-game-section').style.display = activeGame === 'reaction' ? 'flex' : 'none';
+      document.getElementById('w-dots').style.display = game === 'reaction' ? 'flex' : 'none';
+      document.getElementById('w-game-section').style.display = game === 'reaction' ? 'flex' : 'none';
       document.getElementById('w-lb-section').style.display = 'none';
-      document.getElementById('w-aim-section').style.display = activeGame === 'aim' ? 'flex' : 'none';
-      if (activeGame === 'reaction') setWatchState('idle', 'Tap', '');
-      else wAimReset();
+      document.getElementById('w-aim-section').style.display = game === 'aim' ? 'flex' : 'none';
+      document.getElementById('w-rush-section').style.display = game === 'rush' ? 'flex' : 'none';
+      if (game === 'reaction') setWatchState('idle', 'Tap', '');
+      else if (game === 'aim') wAimReset();
+      else wRushReset();
     }
 
     // watch game state
@@ -2809,6 +2887,49 @@
       document.getElementById('w-aim-sub').textContent = r.label;
       saveScore(score);
       checkAchievements();
+    }
+
+    let wRushRunning = false;
+    let wRushCount = 0;
+    let wRushEndsAt = 0;
+    let wRushTimer = null;
+
+    function wRushReset() {
+      wRushRunning = false;
+      wRushCount = 0;
+      clearInterval(wRushTimer);
+      document.getElementById('w-rush-button').textContent = 'Start';
+      const best = localStorage.getItem('watchTapRushBest');
+      document.getElementById('w-rush-info').textContent = best ? 'Best: ' + best : '';
+    }
+
+    function wRushTap() {
+      if (!wRushRunning) {
+        wRushRunning = true;
+        wRushCount = 0;
+        wRushEndsAt = Date.now() + 10000;
+        document.getElementById('w-rush-button').textContent = '0';
+        wRushTimer = setInterval(wRushTick, 200);
+        haptic('go');
+        return;
+      }
+      wRushCount++;
+      document.getElementById('w-rush-button').textContent = wRushCount;
+      haptic('tap');
+    }
+
+    function wRushTick() {
+      const left = Math.max(0, Math.ceil((wRushEndsAt - Date.now()) / 1000));
+      document.getElementById('w-rush-info').textContent = left + 's left';
+      if (left <= 0) {
+        clearInterval(wRushTimer);
+        wRushRunning = false;
+        const best = parseInt(localStorage.getItem('watchTapRushBest') || '0');
+        if (wRushCount > best) localStorage.setItem('watchTapRushBest', String(wRushCount));
+        document.getElementById('w-rush-button').textContent = wRushCount;
+        document.getElementById('w-rush-info').textContent = (wRushCount > best ? 'New best' : 'Done') + ' · tap to retry';
+        haptic('best');
+      }
     }
 
     function setWatchState(state, text, sub) {
