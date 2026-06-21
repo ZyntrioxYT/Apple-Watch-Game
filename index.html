@@ -1185,8 +1185,17 @@
         time,
         timestamp: new Date().toISOString()
       };
-      const scores = getLocalLeaderboard()
-        .concat(entry)
+
+      const scoresByPlayer = new Map();
+      getLocalLeaderboard().concat(entry).forEach(score => {
+        const key = score.uid || score.id;
+        const current = scoresByPlayer.get(key);
+        if (!current || score.time < current.time) {
+          scoresByPlayer.set(key, score);
+        }
+      });
+
+      const scores = [...scoresByPlayer.values()]
         .sort((a, b) => a.time - b.time)
         .slice(0, 10);
 
