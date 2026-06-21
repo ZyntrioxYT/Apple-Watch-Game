@@ -1262,6 +1262,34 @@
       } catch(e){}
     }
 
+    function playChessSound(move) {
+      if (!soundOn) return;
+      try {
+        const ctx = new(window.AudioContext||window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        const gain = ctx.createGain();
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        const notes = [];
+        if (move && move.flags && move.flags.includes('c')) notes.push(260, 392);
+        else if (move && move.san && move.san.includes('#')) notes.push(196, 294, 392);
+        else if (move && move.san && move.san.includes('+')) notes.push(660, 990);
+        else if (move && move.flags && move.flags.includes('k')) notes.push(440, 660);
+        else notes.push(520);
+
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + i * 0.05);
+          osc.connect(gain);
+          osc.start(now + i * 0.05);
+          osc.stop(now + 0.12 + i * 0.05);
+        });
+      } catch (e) {}
+    }
+
     // ── Haptics ───────────────────────────────────────────────
     function haptic(type) {
       if (!navigator.vibrate) return;
@@ -1621,6 +1649,7 @@
         chessSelected = piece && piece.color === chessGame.turn() ? square : null;
       } else {
         chessSelected = null;
+        playChessSound(move);
         haptic('tap');
         scheduleChessBotMove();
       }
@@ -1642,11 +1671,12 @@
       renderChessBoard();
       setTimeout(() => {
         const move = chooseChessBotMove(chessBotLevel);
-        if (move) chessGame.move(move);
+        const played = move ? chessGame.move(move) : null;
         chessBotThinking = false;
         renderChessBoard();
+        if (played) playChessSound(played);
         haptic('tap');
-      }, 380);
+      }, 900 + Math.random() * 700);
     }
 
     function chooseChessBotMove(level) {
@@ -1732,6 +1762,7 @@
       chessSelected = null;
       renderChessBoard();
       renderWatchChess(move.san);
+      playChessSound(move);
       haptic('tap');
       scheduleChessBotMove();
       return true;
