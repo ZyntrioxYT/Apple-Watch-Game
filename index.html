@@ -1724,9 +1724,12 @@
     // ── Online presence ──────────────────────────────────────────
     let presenceUnsub = null;
     let presenceHeartbeat = null;
+    let presenceFreshnessTimer = null;
     let presenceUserId = null;
     const onlineUsers = new Set();
+    const presenceDocs = new Map();
     let presenceUnloadHandler = null;
+    const ONLINE_STALE_MS = 65000;
 
     function presencePayload(online) {
       return {
@@ -1752,9 +1755,13 @@
         ref.set(presencePayload(true), { merge: true }).catch(err => console.error('Presence heartbeat error:', err));
       }, 20000);
       // mark offline on unload
-      if (presenceUnloadHandler) window.removeEventListener('beforeunload', presenceUnloadHandler);
+      if (presenceUnloadHandler) {
+        window.removeEventListener('beforeunload', presenceUnloadHandler);
+        window.removeEventListener('pagehide', presenceUnloadHandler);
+      }
       presenceUnloadHandler = () => ref.set({ online: false, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
       window.addEventListener('beforeunload', presenceUnloadHandler);
+      window.addEventListener('pagehide', presenceUnloadHandler);
     }
 
     function stopPresence() {
@@ -1762,6 +1769,7 @@
       presenceHeartbeat = null;
       if (presenceUnloadHandler) {
         window.removeEventListener('beforeunload', presenceUnloadHandler);
+        window.removeEventListener('pagehide', presenceUnloadHandler);
         presenceUnloadHandler = null;
       }
       const uid = presenceUserId || currentUser?.uid;
@@ -1771,32 +1779,78 @@
         .catch(err => console.error('Presence stop error:', err));
     }
 
+    function getPresenceMillis(data) {
+      if (!data) return 0;
+      const value = data.lastSeen || data.ts;
+      if (!value) return 0;
+      if (typeof value.toMillis === 'function') return value.toMillis();
+      if (typeof value.toDate === 'function') return value.toDate().getTime();
+      if (typeof value === 'number') return value;
+      return 0;
+    }
+
+    function refreshOnlineUsers(forceRender) {
+      const now = Date.now();
+      let changed = false;
+      const nextOnline = new Set();
+
+      presenceDocs.forEach((data, uid) => {
+        if (data.online === true && now - getPresenceMillis(data) <= ONLINE_STALE_MS) {
+          nextOnline.add(uid);
+        }
+      });
+
+      if (nextOnline.size !== onlineUsers.size) {
+        changed = true;
+      } else {
+        nextOnline.forEach(uid => {
+          if (!onlineUsers.has(uid)) changed = true;
+        });
+      }
+
+      onlineUsers.clear();
+      nextOnline.forEach(uid => onlineUsers.add(uid));
+
+      if (!changed && !forceRender) return;
+      if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
+      document.querySelectorAll('#scores li[data-uid], #scores-inline li[data-uid]').forEach(li => {
+        const uid = li.dataset.uid;
+        const existing = li.querySelector('.online-dot');
+        if (onlineUsers.has(uid) && !existing) {
+          const nameEl = li.querySelector('.lname');
+          if (nameEl) nameEl.insertAdjacentHTML('beforeend', '<span class="online-dot"></span>');
+        } else if (!onlineUsers.has(uid) && existing) {
+          existing.remove();
+        }
+      });
+    }
+
     function subscribePresence() {
       if (presenceUnsub) presenceUnsub();
       presenceUnsub = db.collection('presence').where('online', '==', true).onSnapshot(snap => {
-        onlineUsers.clear();
-        snap.docs.forEach(d => onlineUsers.add(d.id));
-        if (document.getElementById('page-friends')?.classList.contains('active')) renderFriendsPage();
-        // re-render leaderboard dots without full refetch
-        document.querySelectorAll('#scores li[data-uid], #scores-inline li[data-uid]').forEach(li => {
-          const uid = li.dataset.uid;
-          const existing = li.querySelector('.online-dot');
-          if (onlineUsers.has(uid) && !existing) {
-            const nameEl = li.querySelector('.lname');
-            if (nameEl) nameEl.insertAdjacentHTML('beforeend', '<span class="online-dot"></span>');
-          } else if (!onlineUsers.has(uid) && existing) {
-            existing.remove();
-          }
+        snap.docChanges().forEach(change => {
+          if (change.type === 'removed') presenceDocs.delete(change.doc.id);
+          else presenceDocs.set(change.doc.id, change.doc.data());
         });
+        refreshOnlineUsers(true);
       }, err => {
         console.error('Presence listener error:', err);
         setFriendsStatus('Online status could not load. Check Firestore rules for presence.', 'error');
       });
+      clearInterval(presenceFreshnessTimer);
+      presenceFreshnessTimer = setInterval(() => refreshOnlineUsers(false), 10000);
     }
 
     auth.onAuthStateChanged(user => {
       if (user) { startPresence(); subscribePresence(); }
-      else { stopPresence(); if (presenceUnsub) presenceUnsub(); }
+      else {
+        stopPresence();
+        if (presenceUnsub) presenceUnsub();
+        clearInterval(presenceFreshnessTimer);
+        presenceFreshnessTimer = null;
+        presenceDocs.clear();
+        onlineUsers.clear();
+      }
     });
 
     // ── Friends ───────────────────────────────────────────────
