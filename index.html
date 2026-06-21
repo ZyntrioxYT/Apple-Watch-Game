@@ -1290,10 +1290,11 @@
       // challenge button — only if online friend
       const cbtn = document.getElementById('pm-challenge-btn');
       if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid)) {
+        const online = onlineUsers.has(uid);
         cbtn.style.display = 'block';
-        cbtn.textContent = onlineUsers.has(uid) ? '⚡ Challenge' : '⚡ Send challenge';
-        cbtn.className = 'friend-btn challenge';
-        cbtn.disabled = false;
+        cbtn.textContent = online ? '⚡ Challenge' : 'Offline';
+        cbtn.className = online ? 'friend-btn challenge' : 'friend-btn pending';
+        cbtn.disabled = !online;
       } else {
         cbtn.style.display = 'none';
       }
@@ -1622,14 +1623,18 @@
     let challengeUnsub = null;
 
     function sendLiveChallenge() {
-      sendLiveChallengeToUid(pmCurrentUid, null);
+      if (!sendLiveChallengeToUid(pmCurrentUid, null)) return;
       const cbtn = document.getElementById('pm-challenge-btn');
       if (cbtn) { cbtn.textContent = 'Challenge sent!'; cbtn.className = 'friend-btn pending'; cbtn.disabled = true; }
       closeModal('player-overlay');
     }
 
     function sendLiveChallengeToUid(toUid, toName) {
-      if (!currentUser || !toUid || toUid === currentUser.uid) return;
+      if (!currentUser || !toUid || toUid === currentUser.uid) return false;
+      if (!onlineUsers.has(toUid)) {
+        showAchieveToast({ icon: '⚡', name: (toName || 'Friend') + ' is offline.' });
+        return false;
+      }
       const id = currentUser.uid + '_' + toUid + '_' + Date.now();
       db.collection('challenges').doc(id).set({
         from: currentUser.uid,
@@ -1640,6 +1645,7 @@
         ts: firebase.firestore.FieldValue.serverTimestamp()
       });
       showAchieveToast({ icon: '⚡', name: 'Challenge sent to ' + (toName || 'friend') + '!' });
+      return true;
     }
 
     function subscribeIncomingChallenges() {
@@ -2029,8 +2035,10 @@
       const rank = myFriends.has(uid) ? 'Friend' : 'Player';
       const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
       const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
-      const challengeBtn = myFriends.has(uid)
+      const challengeBtn = myFriends.has(uid) && online
         ? '<button class="friend-btn challenge square" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
+        : myFriends.has(uid)
+          ? '<button class="friend-btn pending square" disabled>⚡</button>'
         : '';
       return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
         '<div class="friend-info">'+
