@@ -513,7 +513,7 @@
     #w-aim-info { font-size:11px; font-weight:800; min-height:14px; }
     #w-aim-sub { font-size:9px; color:rgba(255,255,255,0.45); min-height:12px; margin-top:2px; }
     #w-rush-section { display:none; width:100%; height:100%; padding:12px; flex-direction:column; justify-content:center; align-items:center; }
-    #w-rush-button { width:min(70vw,120px); aspect-ratio:1; border-radius:50%; border:2px solid rgba(255,255,255,0.12); background:rgba(77,184,255,0.18); color:white; font-size:24px; font-weight:900; font-family:inherit; }
+    #w-rush-button { width:min(70vw,120px); aspect-ratio:1; border-radius:50%; border:2px solid rgba(255,255,255,0.12); background:rgba(77,184,255,0.18); color:white; font-size:22px; font-weight:900; font-family:inherit; }
     #w-rush-info { font-size:11px; color:rgba(255,255,255,0.55); margin-top:8px; min-height:14px; }
 
     /* challenge */
@@ -531,7 +531,7 @@
       <div class="w-select-title">Games</div>
       <button class="w-game-choice" onclick="wSelectGame('reaction')"><strong>⏱ Reaction</strong><span>Tap when green</span></button>
       <button class="w-game-choice" onclick="wSelectGame('aim')"><strong>◎ Aim</strong><span>Hit 10 targets</span></button>
-      <button class="w-game-choice" onclick="wSelectGame('rush')"><strong>✦ Tap Rush</strong><span>Watch only</span></button>
+      <button class="w-game-choice" onclick="wSelectGame('cps')"><strong>✦ CPS Test</strong><span>10 second sprint</span></button>
     </div>
 
     <!-- Page dots -->
@@ -2753,7 +2753,7 @@
       document.getElementById('w-game-section').style.display = game === 'reaction' ? 'flex' : 'none';
       document.getElementById('w-lb-section').style.display = 'none';
       document.getElementById('w-aim-section').style.display = game === 'aim' ? 'flex' : 'none';
-      document.getElementById('w-rush-section').style.display = game === 'rush' ? 'flex' : 'none';
+      document.getElementById('w-rush-section').style.display = game === 'cps' ? 'flex' : 'none';
       if (game === 'reaction') setWatchState('idle', 'Tap', '');
       else if (game === 'aim') wAimReset();
       else wRushReset();
@@ -2899,8 +2899,8 @@
       wRushCount = 0;
       clearInterval(wRushTimer);
       document.getElementById('w-rush-button').textContent = 'Start';
-      const best = localStorage.getItem('watchTapRushBest');
-      document.getElementById('w-rush-info').textContent = best ? 'Best: ' + best : '';
+      const best = localStorage.getItem('watchCpsBest');
+      document.getElementById('w-rush-info').textContent = best ? 'Best: ' + best + ' CPS' : '10 seconds';
     }
 
     function wRushTap() {
@@ -2924,10 +2924,11 @@
       if (left <= 0) {
         clearInterval(wRushTimer);
         wRushRunning = false;
-        const best = parseInt(localStorage.getItem('watchTapRushBest') || '0');
-        if (wRushCount > best) localStorage.setItem('watchTapRushBest', String(wRushCount));
-        document.getElementById('w-rush-button').textContent = wRushCount;
-        document.getElementById('w-rush-info').textContent = (wRushCount > best ? 'New best' : 'Done') + ' · tap to retry';
+        const cps = (wRushCount / 10).toFixed(1);
+        const best = parseFloat(localStorage.getItem('watchCpsBest') || '0');
+        if (parseFloat(cps) > best) localStorage.setItem('watchCpsBest', cps);
+        document.getElementById('w-rush-button').textContent = cps;
+        document.getElementById('w-rush-info').textContent = (parseFloat(cps) > best ? 'New best' : 'Done') + ' CPS · ' + wRushCount + ' taps';
         haptic('best');
       }
     }
