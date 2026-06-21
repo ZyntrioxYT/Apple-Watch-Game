@@ -169,6 +169,15 @@
     .aim-hud-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:9px; }
     .aim-hud-card .val { font-size:18px; font-weight:800; }
     .aim-hud-card .lbl { font-size:10px; color:var(--text-dim); margin-top:2px; }
+    #chess-board { width:min(86vw, 340px); aspect-ratio:1; display:grid; grid-template-columns:repeat(8, 1fr); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin:4px auto 12px; }
+    .chess-square { display:flex; align-items:center; justify-content:center; font-size:clamp(22px, 8vw, 38px); border:none; font-family:"Times New Roman", serif; cursor:pointer; }
+    .chess-square.light { background:#d8c9a3; color:#141414; }
+    .chess-square.dark { background:#6d8755; color:#141414; }
+    .chess-square.selected { outline:3px solid var(--gold); outline-offset:-3px; }
+    .chess-square.legal { box-shadow:inset 0 0 0 999px rgba(255,215,0,0.16); }
+    #chess-status { font-size:14px; font-weight:700; min-height:20px; margin-bottom:8px; }
+    #chess-moves { width:min(86vw, 340px); max-height:96px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; }
+    #chess-controls { display:flex; gap:8px; width:min(86vw, 340px); }
 
     /* ─── LEADERBOARD PAGE ──────────────────────────────────── */
     #lb-tabs { display: flex; gap: 0; background: var(--card); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
@@ -515,6 +524,15 @@
     #w-rush-section { display:none; width:100%; height:100%; padding:12px; flex-direction:column; justify-content:center; align-items:center; }
     #w-rush-button { width:min(70vw,120px); aspect-ratio:1; border-radius:50%; border:2px solid rgba(255,255,255,0.12); background:rgba(77,184,255,0.18); color:white; font-size:22px; font-weight:900; font-family:inherit; }
     #w-rush-info { font-size:11px; color:rgba(255,255,255,0.55); margin-top:8px; min-height:14px; }
+    #w-chess-section { display:none; width:100%; height:100%; padding:10px; flex-direction:column; justify-content:center; }
+    #w-chess-turn { font-size:13px; font-weight:800; }
+    #w-chess-last { font-size:10px; color:rgba(255,255,255,0.5); min-height:14px; margin:4px 0 8px; }
+    #w-chess-board { display:grid; grid-template-columns:repeat(8, 1fr); width:min(76vw, 138px); aspect-ratio:1; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.12); margin:0 auto 8px; }
+    .w-chess-square { display:flex; align-items:center; justify-content:center; font-size:13px; font-family:"Times New Roman", serif; }
+    .w-chess-square.light { background:#d8c9a3; color:#111; }
+    .w-chess-square.dark { background:#6d8755; color:#111; }
+    #w-chess-controls { display:flex; gap:5px; }
+    #w-chess-controls button { flex:1; border:none; border-radius:10px; padding:7px 4px; font-size:10px; font-weight:800; font-family:inherit; background:rgba(255,255,255,0.1); color:white; }
 
     /* challenge */
     #challenge-link-box { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 13px; color: rgba(255,255,255,0.6); font-size: 12px; padding: 11px 13px; margin-bottom: 11px; word-break: break-all; text-align: left; font-family: inherit; }
@@ -531,6 +549,7 @@
       <div class="w-select-title">Games</div>
       <button class="w-game-choice" onclick="wSelectGame('reaction')"><strong>⏱ Reaction</strong><span>Tap when green</span></button>
       <button class="w-game-choice" onclick="wSelectGame('aim')"><strong>◎ Aim</strong><span>Hit 10 targets</span></button>
+      <button class="w-game-choice" onclick="wSelectGame('chess')"><strong>♟ Chess</strong><span>Say e2 to e4</span></button>
       <button class="w-game-choice" onclick="wSelectGame('cps')"><strong>✦ CPS Test</strong><span>10 second sprint</span></button>
     </div>
 
@@ -561,6 +580,17 @@
     <div id="w-rush-section">
       <button id="w-rush-button" onclick="wRushTap()">Start</button>
       <div id="w-rush-info"></div>
+    </div>
+
+    <div id="w-chess-section">
+      <div id="w-chess-turn">Chess</div>
+      <div id="w-chess-last">Say a move</div>
+      <div id="w-chess-board"></div>
+      <div id="w-chess-controls">
+        <button onclick="wChessListen()">Speak</button>
+        <button onclick="wChessTypeMove()">Type</button>
+        <button onclick="resetChessGame()">New</button>
+      </div>
     </div>
 
     <!-- Leaderboard section -->
@@ -719,6 +749,18 @@
             <span class="game-pill">Friends</span>
           </div>
         </div>
+        <div class="game-card" onclick="selectGame('chess')">
+          <div class="game-card-icon">♟</div>
+          <div>
+            <div class="game-card-title">Chess</div>
+            <div class="game-card-sub">Play a full legal chess game. On Apple Watch, speak moves to avoid tiny-board misclicks.</div>
+          </div>
+          <div class="game-card-meta">
+            <span class="game-pill">Legal moves</span>
+            <span class="game-pill">Voice on Watch</span>
+            <span class="game-pill">Local play</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -775,6 +817,16 @@
           </div>
           <div id="aim-rating"></div>
           <div id="aim-stats-bar" style="margin-bottom:12px;"></div>
+        </div>
+
+        <div id="chess-panel" class="game-mode-panel hidden">
+          <div id="chess-status">White to move</div>
+          <div id="chess-board"></div>
+          <div id="chess-moves">No moves yet</div>
+          <div id="chess-controls">
+            <button class="game-btn" onclick="resetChessGame()">New game</button>
+            <button class="game-btn icon-btn" onclick="flipChessBoard()" title="Flip board">↕</button>
+          </div>
         </div>
 
         <div id="btn-row">
@@ -891,6 +943,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 
   <script>
     const firebaseConfig = {
@@ -939,6 +992,12 @@
         localKey: 'aimLocalLeaderboard',
         scoreLabel: value => value + ' ms avg',
         rating: aimRatingFor
+      },
+      chess: {
+        title: 'Chess',
+        hasScores: false,
+        scoreLabel: value => value,
+        rating: () => ({ label: 'Chess', color: '#ffffff' })
       }
     };
     if (!GAME_CONFIG[activeGame]) activeGame = 'reaction';
@@ -1073,7 +1132,7 @@
     setDifficulty('normal');
 
     async function loadActiveBest() {
-      if (!currentUser) { allTimeBest = null; return; }
+      if (!currentUser || gameConfig().hasScores === false) { allTimeBest = null; return; }
       try {
         const doc = await db.collection(gameConfig().scoreCollection).doc(currentUser.uid).get();
         allTimeBest = doc.exists ? doc.data().time : null;
@@ -1091,7 +1150,7 @@
       applyActiveGameUi();
       await loadActiveBest();
       syncLbTabs();
-      subscribeLeaderboard();
+      if (gameConfig().hasScores !== false) subscribeLeaderboard();
       switchPage('game');
       document.getElementById('tab-selector')?.classList.add('active');
     }
@@ -1099,7 +1158,11 @@
     function applyActiveGameUi() {
       document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
       document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');
+      document.getElementById('chess-panel').classList.toggle('hidden', activeGame !== 'chess');
+      document.getElementById('difficulty-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
+      document.getElementById('btn-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
       document.getElementById('game-mode-title').textContent = gameConfig().title;
+      if (activeGame === 'chess') initChessGame();
     }
 
     // ── Sound ─────────────────────────────────────────────────
@@ -1380,6 +1443,138 @@
       updateAimHud();
     }
 
+    // ── Chess ───────────────────────────────────────────────────
+    let chessGame = null;
+    let chessSelected = null;
+    let chessFlipped = false;
+
+    const CHESS_PIECES = {
+      wp:'♙', wn:'♘', wb:'♗', wr:'♖', wq:'♕', wk:'♔',
+      bp:'♟', bn:'♞', bb:'♝', br:'♜', bq:'♛', bk:'♚'
+    };
+
+    function createChessGame() {
+      if (typeof Chess !== 'function') return null;
+      return new Chess();
+    }
+
+    function initChessGame() {
+      if (!chessGame) resetChessGame(false);
+      renderChessBoard();
+    }
+
+    function resetChessGame(recordPlay) {
+      chessGame = createChessGame();
+      chessSelected = null;
+      if (recordPlay !== false) recordGamePlay('chess');
+      renderChessBoard();
+      renderWatchChess();
+    }
+
+    function chessFiles() {
+      return chessFlipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+    }
+
+    function chessRanks() {
+      return chessFlipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
+    }
+
+    function chessSquareAt(file, rank) {
+      return chessFiles()[file] + chessRanks()[rank];
+    }
+
+    function chessStatusText() {
+      if (!chessGame) return 'Chess engine unavailable';
+      if (chessGame.in_checkmate()) return (chessGame.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate';
+      if (chessGame.in_draw()) return 'Draw';
+      return (chessGame.turn() === 'w' ? 'White' : 'Black') + (chessGame.in_check() ? ' in check' : ' to move');
+    }
+
+    function renderChessBoard() {
+      const boardEl = document.getElementById('chess-board');
+      if (!boardEl || activeGame !== 'chess') return;
+      if (!chessGame) {
+        boardEl.innerHTML = '<div style="grid-column:1/-1;padding:20px;color:var(--text-dim);font-size:13px;">Chess engine could not load.</div>';
+        return;
+      }
+
+      const legalTargets = chessSelected ? chessGame.moves({ square: chessSelected, verbose: true }).map(m => m.to) : [];
+      boardEl.innerHTML = '';
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const square = chessSquareAt(f, r);
+          const piece = chessGame.get(square);
+          const btn = document.createElement('button');
+          btn.className = 'chess-square ' + ((f + r) % 2 === 0 ? 'light' : 'dark');
+          if (square === chessSelected) btn.classList.add('selected');
+          if (legalTargets.includes(square)) btn.classList.add('legal');
+          btn.dataset.square = square;
+          btn.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
+          btn.addEventListener('click', () => handleChessSquare(square));
+          boardEl.appendChild(btn);
+        }
+      }
+      document.getElementById('chess-status').textContent = chessStatusText();
+      const history = chessGame.history();
+      document.getElementById('chess-moves').textContent = history.length ? history.join(' ') : 'No moves yet';
+    }
+
+    function handleChessSquare(square) {
+      if (!chessGame || chessGame.game_over()) return;
+      const piece = chessGame.get(square);
+      if (!chessSelected) {
+        if (piece && piece.color === chessGame.turn()) chessSelected = square;
+        renderChessBoard();
+        return;
+      }
+
+      const move = chessGame.move({ from: chessSelected, to: square, promotion: 'q' });
+      if (!move) {
+        chessSelected = piece && piece.color === chessGame.turn() ? square : null;
+      } else {
+        chessSelected = null;
+        haptic('tap');
+      }
+      renderChessBoard();
+    }
+
+    function flipChessBoard() {
+      chessFlipped = !chessFlipped;
+      renderChessBoard();
+    }
+
+    function parseSpokenChessMove(text) {
+      const cleaned = String(text).toLowerCase()
+        .replace(/won/g, 'one')
+        .replace(/too|to|two/g, '2')
+        .replace(/for|four/g, '4')
+        .replace(/ate/g, '8')
+        .replace(/one/g, '1')
+        .replace(/three/g, '3')
+        .replace(/five/g, '5')
+        .replace(/six/g, '6')
+        .replace(/seven/g, '7')
+        .replace(/eight/g, '8')
+        .replace(/[^a-h1-8]/g, '');
+      const match = cleaned.match(/[a-h][1-8].*?[a-h][1-8]/);
+      if (!match) return null;
+      const squares = match[0].match(/[a-h][1-8]/g);
+      return squares && squares.length >= 2 ? { from: squares[0], to: squares[1] } : null;
+    }
+
+    function playChessMoveText(text) {
+      if (!chessGame) resetChessGame();
+      const parsed = parseSpokenChessMove(text);
+      if (!parsed) return false;
+      const move = chessGame.move({ from: parsed.from, to: parsed.to, promotion: 'q' });
+      if (!move) return false;
+      chessSelected = null;
+      renderChessBoard();
+      renderWatchChess(move.san);
+      haptic('tap');
+      return true;
+    }
+
     // ── Rating ────────────────────────────────────────────────
     const RATINGS=[
       {max:150,label:'⚡ Superhuman',color:'#ff4fc8'},
@@ -1517,8 +1712,32 @@
       const counts = profile?.gamePlays || {};
       const reaction = counts.reaction || 0;
       const aim = counts.aim || 0;
-      if (!reaction && !aim) return '—';
-      return reaction >= aim ? 'Reaction Time' : 'Aim Trainer';
+      const chess = counts.chess || 0;
+      if (!reaction && !aim && !chess) return '—';
+      const entries = [
+        ['Reaction Time', reaction],
+        ['Aim Trainer', aim],
+        ['Chess', chess]
+      ];
+      return entries.sort((a, b) => b[1] - a[1])[0][0];
+    }
+
+    async function recordGamePlay(game) {
+      const player = getPlayerInfo();
+      if (player.isGuest) return;
+      const ref = db.collection('profiles').doc(player.id);
+      const snap = await ref.get().catch(() => null);
+      const current = snap?.exists ? snap.data() : {};
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0 }, current.gamePlays || {});
+      gamePlays[game] = (gamePlays[game] || 0) + 1;
+      await ref.set({
+        uid: player.uid,
+        name: player.name,
+        photoURL: player.photoURL || '',
+        gamePlays,
+        mostPlayedGame: mostPlayedGameFromProfile({ gamePlays }),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => console.error('Profile play count failed:', err));
     }
 
     async function savePlayerProfile(player) {
@@ -1526,7 +1745,7 @@
       const ref = db.collection('profiles').doc(player.id);
       const snap = await ref.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
-      const gamePlays = Object.assign({ reaction: 0, aim: 0 }, current.gamePlays || {});
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0 }, current.gamePlays || {});
       gamePlays[activeGame] = (gamePlays[activeGame] || 0) + 1;
       const profile = {
         uid: player.uid,
@@ -1645,6 +1864,13 @@
 
     function subscribeLeaderboard() {
       if(lbUnsub) lbUnsub();
+      if (gameConfig().hasScores === false) {
+        ['scores', 'scores-inline'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No chess leaderboard</li>';
+        });
+        return;
+      }
 
       if (lbFilter === 'friends') {
         subscribeFriendsLeaderboard(['scores', 'scores-inline']);
@@ -1701,6 +1927,7 @@
     }
 
     function challengeStatusLabel(uid) {
+      if (gameConfig().hasScores === false) return 'Unavailable';
       if (!currentUser || !uid || uid === currentUser.uid) return 'Unavailable';
       if (!myFriends.has(uid)) return 'Friends only';
       return onlineUsers.has(uid) ? 'Ready' : 'Offline';
@@ -1754,7 +1981,7 @@
 
       // challenge button — only if online friend
       const cbtn = document.getElementById('pm-challenge-btn');
-      if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid)) {
+      if (currentUser && uid && uid !== currentUser.uid && myFriends.has(uid) && gameConfig().hasScores !== false) {
         const online = onlineUsers.has(uid);
         cbtn.style.display = 'block';
         cbtn.textContent = online ? '⚡ Challenge' : 'Offline';
@@ -2100,6 +2327,10 @@
 
     function sendLiveChallengeToUid(toUid, toName) {
       if (!currentUser || !toUid || toUid === currentUser.uid) return false;
+      if (gameConfig().hasScores === false) {
+        showAchieveToast({ icon: '♟', name: 'Chess challenges are not available yet.' });
+        return false;
+      }
       if (!onlineUsers.has(toUid)) {
         showAchieveToast({ icon: '⚡', name: (toName || 'Friend') + ' is offline.' });
         return false;
@@ -2515,9 +2746,9 @@
       const rank = myFriends.has(uid) ? 'Friend' : 'Player';
       const timestamp = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().toISOString() : null;
       const profileData = encodeURIComponent(JSON.stringify({ uid, name: data.name || 'Unknown', photoURL: data.photoURL || '', time: data.time || null, timestamp }));
-      const challengeBtn = myFriends.has(uid) && online
+      const challengeBtn = myFriends.has(uid) && online && gameConfig().hasScores !== false
         ? '<button class="friend-btn challenge square" onclick="event.stopPropagation();sendLiveChallengeToUid(\''+uid+'\',null)">⚡</button>'
-        : myFriends.has(uid)
+        : myFriends.has(uid) && gameConfig().hasScores !== false
           ? '<button class="friend-btn pending square" disabled>⚡</button>'
         : '';
       return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
@@ -2746,7 +2977,7 @@
     }
 
     function wSelectGame(game) {
-      activeGame = game === 'aim' ? 'aim' : 'reaction';
+      activeGame = game === 'aim' || game === 'chess' ? game : 'reaction';
       if (game !== 'rush') localStorage.setItem('activeGame', activeGame);
       document.getElementById('w-selector-section').style.display = 'none';
       document.getElementById('w-dots').style.display = game === 'reaction' ? 'flex' : 'none';
@@ -2754,8 +2985,10 @@
       document.getElementById('w-lb-section').style.display = 'none';
       document.getElementById('w-aim-section').style.display = game === 'aim' ? 'flex' : 'none';
       document.getElementById('w-rush-section').style.display = game === 'cps' ? 'flex' : 'none';
+      document.getElementById('w-chess-section').style.display = game === 'chess' ? 'flex' : 'none';
       if (game === 'reaction') setWatchState('idle', 'Tap', '');
       else if (game === 'aim') wAimReset();
+      else if (game === 'chess') { initChessGame(); renderWatchChess(); }
       else wRushReset();
     }
 
@@ -2931,6 +3164,61 @@
         document.getElementById('w-rush-info').textContent = (parseFloat(cps) > best ? 'New best' : 'Done') + ' CPS · ' + wRushCount + ' taps';
         haptic('best');
       }
+    }
+
+    function renderWatchChess(lastMove) {
+      const boardEl = document.getElementById('w-chess-board');
+      if (!boardEl) return;
+      if (!chessGame) chessGame = createChessGame();
+      if (!chessGame) {
+        document.getElementById('w-chess-turn').textContent = 'No engine';
+        document.getElementById('w-chess-last').textContent = 'Check connection';
+        return;
+      }
+      boardEl.innerHTML = '';
+      const files = ['a','b','c','d','e','f','g','h'];
+      const ranks = ['8','7','6','5','4','3','2','1'];
+      for (let r = 0; r < 8; r++) {
+        for (let f = 0; f < 8; f++) {
+          const square = files[f] + ranks[r];
+          const piece = chessGame.get(square);
+          const cell = document.createElement('div');
+          cell.className = 'w-chess-square ' + ((f + r) % 2 === 0 ? 'light' : 'dark');
+          cell.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
+          boardEl.appendChild(cell);
+        }
+      }
+      document.getElementById('w-chess-turn').textContent = chessStatusText();
+      document.getElementById('w-chess-last').textContent = lastMove ? 'Last: ' + lastMove : 'Say e2 to e4';
+    }
+
+    function wChessTypeMove() {
+      const move = prompt('Move, like e2 to e4');
+      if (!move) return;
+      const ok = playChessMoveText(move);
+      renderWatchChess(ok ? move : 'Invalid move');
+      if (!ok) haptic('early');
+    }
+
+    function wChessListen() {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) { wChessTypeMove(); return; }
+      const rec = new Speech();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      document.getElementById('w-chess-last').textContent = 'Listening...';
+      rec.onresult = event => {
+        const spoken = event.results[0][0].transcript;
+        const ok = playChessMoveText(spoken);
+        renderWatchChess(ok ? spoken : 'Invalid: ' + spoken);
+        if (!ok) haptic('early');
+      };
+      rec.onerror = () => {
+        document.getElementById('w-chess-last').textContent = 'Speech failed';
+        haptic('early');
+      };
+      rec.start();
     }
 
     function setWatchState(state, text, sub) {
