@@ -72,6 +72,7 @@
     .tab-item.active { color: var(--green); }
     .tab-icon { font-size: 22px; line-height: 1; }
     .tab-label { font-size: 10px; font-weight: 600; margin-top: 3px; letter-spacing: 0.03em; }
+    body.selector-mode #tab-bar { display:none; }
 
     /* ─── Shared header ────────────────────────────────────── */
     .page-header {
@@ -366,6 +367,7 @@
 
       /* shift pages right to clear sidebar */
       #pages { margin-left: 88px; height: 100dvh; overflow: hidden; }
+      body.selector-mode #pages { margin-left: 0; }
 
       /* widen page content */
       .page { padding: 0 32px 32px; max-width: none; }
@@ -444,6 +446,11 @@
 
     #watch-ui.w-bg-wait { background: radial-gradient(circle, rgba(180,20,20,0.6) 0%, #000 70%); }
     #watch-ui.w-bg-go   { background: radial-gradient(circle, rgba(0,160,60,0.6) 0%, #000 70%); }
+    #w-selector-section { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; gap:7px; padding:12px; }
+    .w-select-title { font-size:13px; font-weight:800; color:white; margin-bottom:2px; }
+    .w-game-choice { border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.07); color:white; border-radius:14px; padding:9px 8px; font-family:inherit; text-align:left; }
+    .w-game-choice strong { display:block; font-size:12px; }
+    .w-game-choice span { display:block; font-size:9px; color:rgba(255,255,255,0.45); margin-top:2px; }
 
     /* page dots */
     #w-dots { display: flex; gap: 5px; margin-bottom: 6px; }
@@ -499,31 +506,52 @@
     }
 
     #w-lb-list { display: flex; flex-direction: column; gap: 1px; }
+    #w-aim-section { display:none; width:100%; height:100%; padding:12px; flex-direction:column; justify-content:center; }
+    #w-aim-pad { position:relative; width:min(82vw,150px); aspect-ratio:1; border-radius:22px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.05); margin:0 auto 7px; overflow:hidden; }
+    #w-aim-target { display:none; position:absolute; width:34px; height:34px; border-radius:50%; background:radial-gradient(circle, #ff5555 0 28%, #ffd700 29% 54%, #4db8ff 55% 100%); transform:translate(-50%,-50%); }
+    #w-aim-target.show { display:block; }
+    #w-aim-info { font-size:11px; font-weight:800; min-height:14px; }
+    #w-aim-sub { font-size:9px; color:rgba(255,255,255,0.45); min-height:12px; margin-top:2px; }
 
     /* challenge */
     #challenge-link-box { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 13px; color: rgba(255,255,255,0.6); font-size: 12px; padding: 11px 13px; margin-bottom: 11px; word-break: break-all; text-align: left; font-family: inherit; }
     .copy-btn { width: 100%; font-size: 15px; font-weight: 600; padding: 13px; border: none; border-radius: 15px; background: linear-gradient(135deg,var(--green),#00a844); color: white; cursor: pointer; margin-bottom: 9px; font-family: inherit; }
   </style>
 </head>
-<body class="state-idle">
+<body class="state-idle selector-mode">
 
   <canvas id="confetti-canvas"></canvas>
 
   <!-- ─── APPLE WATCH UI ──────────────────────────────────── -->
   <div id="watch-ui" style="display:none;">
+    <div id="w-selector-section">
+      <div class="w-select-title">Games</div>
+      <button class="w-game-choice" onclick="wSelectGame('reaction')"><strong>⏱ Reaction</strong><span>Tap when green</span></button>
+      <button class="w-game-choice" onclick="wSelectGame('aim')"><strong>◎ Aim</strong><span>Hit 10 targets</span></button>
+    </div>
+
     <!-- Page dots -->
-    <div id="w-dots">
+    <div id="w-dots" style="display:none;">
       <div class="w-dot" id="w-dot-0" style="opacity:1;"></div>
       <div class="w-dot" id="w-dot-1" style="opacity:0.3;"></div>
     </div>
 
     <!-- Game section -->
-    <div id="w-game-section" onclick="wTogglePage()">
+    <div id="w-game-section" style="display:none;" onclick="wTogglePage()">
       <div id="w-tap" class="w-circle w-idle" onclick="event.stopPropagation(); watchHandleTap()">
         <span id="w-text">Tap</span>
         <span id="w-sub"></span>
       </div>
       <button id="w-start" onclick="event.stopPropagation(); watchStart()">Start</button>
+    </div>
+
+    <div id="w-aim-section">
+      <div id="w-aim-pad" onclick="wAimMiss(event)">
+        <div id="w-aim-target" onclick="wAimHit(event)"></div>
+      </div>
+      <div id="w-aim-info">Tap Start</div>
+      <div id="w-aim-sub"></div>
+      <button id="w-aim-start" onclick="wAimStart()">Start</button>
     </div>
 
     <!-- Leaderboard section -->
@@ -870,6 +898,7 @@
     // ── Tab navigation ────────────────────────────────────────
     function switchPage(name) {
       if (name === 'selector') stopGame();
+      document.body.classList.toggle('selector-mode', name === 'selector');
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
       document.getElementById('page-' + name).classList.add('active');
@@ -2109,6 +2138,7 @@
       }, 1000);
       // switch to game tab
       switchPage('game');
+      document.body.classList.remove('selector-mode');
       document.getElementById('tab-selector')?.classList.add('active');
     }
 
@@ -2621,10 +2651,6 @@
       document.getElementById('tab-bar').style.display = 'none';
       watchEl.style.display = 'flex';
 
-      // wire up watch tap
-      document.getElementById('w-tap').addEventListener('click', watchHandleTap);
-      document.getElementById('w-start').addEventListener('click', watchStart);
-
       // subscribe leaderboard for watch
       db.collection('scores').orderBy('time').limit(5).onSnapshot(snap => {
         const list = document.getElementById('w-lb-list');
@@ -2643,11 +2669,24 @@
       });
     }
 
+    function wSelectGame(game) {
+      activeGame = game === 'aim' ? 'aim' : 'reaction';
+      localStorage.setItem('activeGame', activeGame);
+      document.getElementById('w-selector-section').style.display = 'none';
+      document.getElementById('w-dots').style.display = activeGame === 'reaction' ? 'flex' : 'none';
+      document.getElementById('w-game-section').style.display = activeGame === 'reaction' ? 'flex' : 'none';
+      document.getElementById('w-lb-section').style.display = 'none';
+      document.getElementById('w-aim-section').style.display = activeGame === 'aim' ? 'flex' : 'none';
+      if (activeGame === 'reaction') setWatchState('idle', 'Tap', '');
+      else wAimReset();
+    }
+
     // watch game state
     let wWaiting=false, wReady=false, wRunning=false, wStartTime=0;
     let wTimeout, wNextTimeout;
 
     function watchStart() {
+      activeGame = 'reaction';
       wRunning = true;
       document.getElementById('w-start').style.display = 'none';
       watchNextRound();
@@ -2692,6 +2731,84 @@
 
         wNextTimeout = setTimeout(watchNextRound, 1600);
       }
+    }
+
+    let wAimRunning = false;
+    let wAimHits = 0;
+    let wAimMisses = 0;
+    let wAimTargetAt = 0;
+    let wAimTimes = [];
+
+    function wAimReset() {
+      wAimRunning = false;
+      wAimHits = 0;
+      wAimMisses = 0;
+      wAimTimes = [];
+      document.getElementById('w-aim-target').classList.remove('show');
+      document.getElementById('w-aim-info').textContent = 'Tap Start';
+      document.getElementById('w-aim-sub').textContent = '';
+      document.getElementById('w-aim-start').style.display = 'inline-block';
+    }
+
+    function wAimStart() {
+      activeGame = 'aim';
+      wAimRunning = true;
+      wAimHits = 0;
+      wAimMisses = 0;
+      wAimTimes = [];
+      document.getElementById('w-aim-start').style.display = 'none';
+      wAimUpdate();
+      wAimPlaceTarget();
+    }
+
+    function wAimPlaceTarget() {
+      if (!wAimRunning) return;
+      const pad = document.getElementById('w-aim-pad');
+      const target = document.getElementById('w-aim-target');
+      const rect = pad.getBoundingClientRect();
+      const size = 34;
+      target.style.left = (size / 2 + Math.random() * Math.max(1, rect.width - size)) + 'px';
+      target.style.top = (size / 2 + Math.random() * Math.max(1, rect.height - size)) + 'px';
+      target.classList.add('show');
+      wAimTargetAt = Date.now();
+    }
+
+    function wAimUpdate() {
+      const avg = wAimTimes.length ? Math.round(wAimTimes.reduce((a,b)=>a+b,0) / wAimTimes.length) : null;
+      document.getElementById('w-aim-info').textContent = wAimHits + '/10' + (avg ? ' · ' + avg + 'ms' : '');
+      document.getElementById('w-aim-sub').textContent = wAimMisses ? 'Misses: ' + wAimMisses : '';
+    }
+
+    function wAimHit(e) {
+      e.stopPropagation();
+      if (!wAimRunning) return;
+      wAimTimes.push(Date.now() - wAimTargetAt);
+      wAimHits++;
+      haptic('tap');
+      playTapSound();
+      if (wAimHits >= 10) { wAimFinish(); return; }
+      wAimUpdate();
+      wAimPlaceTarget();
+    }
+
+    function wAimMiss(e) {
+      if (!wAimRunning || e.target.id === 'w-aim-target') return;
+      wAimMisses++;
+      haptic('early');
+      wAimUpdate();
+    }
+
+    function wAimFinish() {
+      wAimRunning = false;
+      document.getElementById('w-aim-target').classList.remove('show');
+      document.getElementById('w-aim-start').style.display = 'inline-block';
+      const avg = Math.round(wAimTimes.reduce((a,b)=>a+b,0) / wAimTimes.length);
+      const score = avg + wAimMisses * 35;
+      const r = aimRatingFor(score);
+      document.getElementById('w-aim-info').textContent = score + 'ms avg';
+      document.getElementById('w-aim-sub').textContent = r.label;
+      saveScore(score);
+      checkAchievements();
     }
 
     function setWatchState(state, text, sub) {
