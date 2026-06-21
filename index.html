@@ -178,6 +178,9 @@
     #chess-status { font-size:15px; font-weight:800; min-height:22px; margin-bottom:8px; }
     #chess-moves { width:min(86vw, 340px); max-height:120px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.55; }
     #chess-controls { display:flex; gap:8px; width:min(86vw, 340px); }
+    #chess-bot-row { width:min(86vw, 340px); display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:12px; padding:3px; }
+    .chess-bot-btn { border:none; border-radius:9px; background:transparent; color:var(--text-dim); font-size:12px; font-weight:700; padding:7px 4px; font-family:inherit; cursor:pointer; }
+    .chess-bot-btn.active { background:rgba(255,255,255,0.1); color:white; }
     body.chess-mode #game-col-right { display:none !important; }
 
     /* ─── LEADERBOARD PAGE ──────────────────────────────────── */
@@ -448,6 +451,11 @@
       }
       body.chess-mode #chess-controls {
         width:100%;
+        margin:0;
+      }
+      body.chess-mode #chess-bot-row {
+        width:100%;
+        grid-column:2;
         margin:0;
       }
 
@@ -873,6 +881,12 @@
           <div id="chess-status">White to move</div>
           <div id="chess-board"></div>
           <div id="chess-moves"><strong>Moves</strong><br>No moves yet</div>
+          <div id="chess-bot-row">
+            <button class="chess-bot-btn active" data-bot="none" onclick="setChessBot('none')">Human</button>
+            <button class="chess-bot-btn" data-bot="easy" onclick="setChessBot('easy')">Easy</button>
+            <button class="chess-bot-btn" data-bot="medium" onclick="setChessBot('medium')">Med</button>
+            <button class="chess-bot-btn" data-bot="hard" onclick="setChessBot('hard')">Hard</button>
+          </div>
           <div id="chess-controls">
             <button class="game-btn" onclick="resetChessGame()">New game</button>
             <button class="game-btn icon-btn" onclick="flipChessBoard()" title="Flip board">↕</button>
@@ -1509,11 +1523,14 @@
     let chessGame = null;
     let chessSelected = null;
     let chessFlipped = false;
+    let chessBotLevel = 'none';
+    let chessBotThinking = false;
 
     const CHESS_PIECES = {
       wp:'♙', wn:'♘', wb:'♗', wr:'♖', wq:'♕', wk:'♔',
       bp:'♟', bn:'♞', bb:'♝', br:'♜', bq:'♛', bk:'♚'
     };
+    const CHESS_VALUES = { p:100, n:320, b:330, r:500, q:900, k:0 };
 
     function createChessGame() {
       if (typeof Chess !== 'function') return null;
@@ -1528,9 +1545,16 @@
     function resetChessGame(recordPlay) {
       chessGame = createChessGame();
       chessSelected = null;
+      chessBotThinking = false;
       if (recordPlay !== false) recordGamePlay('chess');
       renderChessBoard();
       renderWatchChess();
+    }
+
+    function setChessBot(level) {
+      chessBotLevel = level;
+      document.querySelectorAll('.chess-bot-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.bot === level));
+      resetChessGame();
     }
 
     function chessFiles() {
@@ -1547,6 +1571,7 @@
 
     function chessStatusText() {
       if (!chessGame) return 'Chess engine unavailable';
+      if (chessBotThinking) return 'Bot thinking...';
       if (chessGame.in_checkmate()) return (chessGame.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate';
       if (chessGame.in_draw()) return 'Draw';
       return (chessGame.turn() === 'w' ? 'White' : 'Black') + (chessGame.in_check() ? ' in check' : ' to move');
@@ -1582,7 +1607,8 @@
     }
 
     function handleChessSquare(square) {
-      if (!chessGame || chessGame.game_over()) return;
+      if (!chessGame || chessGame.game_over() || chessBotThinking) return;
+      if (isChessBotTurn()) return;
       const piece = chessGame.get(square);
       if (!chessSelected) {
         if (piece && piece.color === chessGame.turn()) chessSelected = square;
@@ -1596,6 +1622,7 @@
       } else {
         chessSelected = null;
         haptic('tap');
+        scheduleChessBotMove();
       }
       renderChessBoard();
     }
@@ -1603,6 +1630,78 @@
     function flipChessBoard() {
       chessFlipped = !chessFlipped;
       renderChessBoard();
+    }
+
+    function isChessBotTurn() {
+      return chessBotLevel !== 'none' && chessGame && chessGame.turn() === 'b' && !chessGame.game_over();
+    }
+
+    function scheduleChessBotMove() {
+      if (!isChessBotTurn()) return;
+      chessBotThinking = true;
+      renderChessBoard();
+      setTimeout(() => {
+        const move = chooseChessBotMove(chessBotLevel);
+        if (move) chessGame.move(move);
+        chessBotThinking = false;
+        renderChessBoard();
+        haptic('tap');
+      }, 380);
+    }
+
+    function chooseChessBotMove(level) {
+      const moves = chessGame.moves({ verbose: true });
+      if (!moves.length) return null;
+      if (level === 'easy') return moves[Math.floor(Math.random() * moves.length)];
+      if (level === 'medium') return chooseMediumChessMove(moves);
+      return chooseHardChessMove(moves);
+    }
+
+    function moveScore(move) {
+      let score = 0;
+      if (move.captured) score += (CHESS_VALUES[move.captured] || 0) - (CHESS_VALUES[move.piece] || 0) * 0.1;
+      if (move.san.includes('+')) score += 45;
+      if (move.san.includes('#')) score += 10000;
+      if (move.flags.includes('p')) score += 800;
+      if (['d4','e4','d5','e5'].includes(move.to)) score += 18;
+      return score + Math.random() * 8;
+    }
+
+    function chooseMediumChessMove(moves) {
+      return moves.slice().sort((a, b) => moveScore(b) - moveScore(a))[0];
+    }
+
+    function evaluateChessBoard() {
+      let score = 0;
+      const board = chessGame.board();
+      board.forEach(row => row.forEach(piece => {
+        if (!piece) return;
+        const value = CHESS_VALUES[piece.type] || 0;
+        score += piece.color === 'b' ? value : -value;
+      }));
+      if (chessGame.in_checkmate()) score += chessGame.turn() === 'w' ? 100000 : -100000;
+      if (chessGame.in_draw()) score = 0;
+      return score;
+    }
+
+    function chooseHardChessMove(moves) {
+      let best = null;
+      let bestScore = -Infinity;
+      moves.forEach(move => {
+        chessGame.move(move);
+        let replyPenalty = 0;
+        const replies = chessGame.moves({ verbose: true });
+        replies.forEach(reply => {
+          replyPenalty = Math.max(replyPenalty, moveScore(reply));
+        });
+        const score = evaluateChessBoard() + moveScore(move) - replyPenalty * 0.55;
+        chessGame.undo();
+        if (score > bestScore) {
+          bestScore = score;
+          best = move;
+        }
+      });
+      return best || chooseMediumChessMove(moves);
     }
 
     function parseSpokenChessMove(text) {
@@ -1634,6 +1733,7 @@
       renderChessBoard();
       renderWatchChess(move.san);
       haptic('tap');
+      scheduleChessBotMove();
       return true;
     }
 
