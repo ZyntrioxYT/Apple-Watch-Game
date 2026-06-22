@@ -72,6 +72,12 @@
 
     let achieveStats={best:null,totalRounds:0,maxStreak:0,lbRank:null};
     let unlockedAchieves=new Set(JSON.parse(localStorage.getItem('achievements')||'[]'));
+    let profileDevTapCount = 0;
+    let profileDevTapTimer = null;
+
+    function profileDevUnlocked() {
+      return localStorage.getItem('profileDevUnlocked') === '1';
+    }
 
     function checkAchievements() {
       achieveStats.best        = allTimeBest;
@@ -568,10 +574,41 @@
         (pendingIn.size > 0 ?
           '<div class="profile-section-title" style="margin-top:8px;">Pending requests <span style="background:#ff3d00;color:white;font-size:10px;font-weight:700;border-radius:8px;padding:1px 6px;margin-left:4px;">'+pendingIn.size+'</span></div>'+
           '<div id="pending-list"></div>' : '')+
+        (profileDevUnlocked() ?
+          '<div class="profile-section-title" style="margin-top:16px;">Dev</div>'+
+          '<div class="sign-out-row" style="margin-top:0;">'+
+            '<button class="modal-close" style="margin-top:0;" onclick="resetRankedSessionsFromProfile()">End my active ranked matches</button>'+
+            '<div id="profile-dev-status" style="color:var(--text-dim);font-size:12px;margin-top:8px;text-align:center;"></div>'+
+          '</div>' : '')+
         '<div class="profile-section-title" style="margin-top:16px;">Achievements</div>'+
         '<div class="achieve-grid">'+achieveHtml+'</div>'+
         '<div class="sign-out-row"><button class="modal-close" onclick="signOut()">Sign out</button></div>';
       setTimeout(renderFriendsList, 50);
+    }
+
+    function toggleProfileDevUnlock() {
+      if (!document.getElementById('page-profile')?.classList.contains('active')) return;
+      clearTimeout(profileDevTapTimer);
+      profileDevTapCount++;
+      profileDevTapTimer = setTimeout(() => { profileDevTapCount = 0; }, 900);
+      if (profileDevTapCount < 5) return;
+      profileDevTapCount = 0;
+      const next = profileDevUnlocked() ? '0' : '1';
+      localStorage.setItem('profileDevUnlocked', next);
+      renderProfile();
+      showAchieveToast({ icon: next === '1' ? '🛠️' : '🙈', name: next === '1' ? 'Dev tools unlocked' : 'Dev tools hidden' });
+    }
+
+    async function resetRankedSessionsFromProfile() {
+      if (!currentUser) return;
+      const status = document.getElementById('profile-dev-status');
+      if (status) status.textContent = 'Ending active ranked sessions...';
+      const result = await resetMyRankedSessions().catch(() => ({ matches: 0, queues: 0, failed: true }));
+      if (status) {
+        status.textContent = result.failed
+          ? 'Could not end ranked sessions.'
+          : 'Ended ' + result.matches + ' matches and canceled ' + result.queues + ' queues.';
+      }
     }
 
     function toggleNameEdit() {

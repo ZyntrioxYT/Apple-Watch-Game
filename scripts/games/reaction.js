@@ -743,6 +743,54 @@
       leaveRankedMatch(reason || 'left_match');
     }
 
+    async function resetMyRankedSessions() {
+      if (!currentUser) return { matches: 0, queues: 0 };
+      const queueSnap = await db.collection('rankedQueue')
+        .where('uid', '==', currentUser.uid)
+        .limit(20)
+        .get()
+        .catch(() => null);
+      let queueCount = 0;
+      if (queueSnap?.docs?.length) {
+        await Promise.all(queueSnap.docs.map(doc => {
+          const data = doc.data();
+          if (!['searching', 'matched'].includes(data.status)) return Promise.resolve();
+          queueCount++;
+          return doc.ref.set({
+            status: 'canceled',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        }));
+      }
+
+      const matchSnap = await db.collection('rankedMatches')
+        .where('authorizedUids', 'array-contains', currentUser.uid)
+        .limit(20)
+        .get()
+        .catch(() => null);
+      let matchCount = 0;
+      if (matchSnap?.docs?.length) {
+        await Promise.all(matchSnap.docs.map(doc => {
+          const data = doc.data();
+          if (data.state === 'complete') return Promise.resolve();
+          matchCount++;
+          return doc.ref.set({
+            state: 'complete',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            result: {
+              winner: 'draw',
+              reason: 'admin_reset',
+              text: 'Match ended by reset',
+              scores: data.result?.scores || {}
+            }
+          }, { merge: true }).catch(() => {});
+        }));
+      }
+
+      resetRankedState(false);
+      return { matches: matchCount, queues: queueCount };
+    }
+
     function scheduleRankedGameStart() {
       clearTimeout(rankedStartTimer);
       if (!rankedMatchData || rankedMatchData.state === 'complete') return;
