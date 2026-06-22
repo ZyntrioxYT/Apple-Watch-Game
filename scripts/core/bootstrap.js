@@ -115,6 +115,7 @@
         resetRankedState(false);
       }
       await loadRankedRatings();
+      if (user) await restoreRankedSession();
       subscribeLeaderboard();
       renderRankedPanel();
     });
@@ -243,4 +244,3 @@
         if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No ' + escHtml(gameConfig().title.toLowerCase()) + ' leaderboard</li>';
       });
     }
-

@@ -131,12 +131,12 @@
       if (lbFilter === 'local') renderLocalLeaderboard();
     }
 
-    function mostPlayedGameFromProfile(profile) {
-      const counts = profile?.gamePlays || {};
+    function mostPlayedGameFromProfile(profile, options) {
+      const counts = getProfilePlayCounts(profile, options);
       const reaction = counts.reaction || 0;
       const aim = counts.aim || 0;
       const chess = counts.chess || 0;
-      const cps = Math.max(counts.cps || 0, getWatchCpsPlays());
+      const cps = counts.cps || 0;
       if (!reaction && !aim && !chess && !cps) return '—';
       const entries = [
         ['Reaction Time', reaction],
@@ -147,15 +147,17 @@
       return entries.sort((a, b) => b[1] - a[1])[0][0];
     }
 
-    function getProfilePlayCounts(profile) {
+    function getProfilePlayCounts(profile, options) {
       const counts = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, profile?.gamePlays || {});
-      counts.cps = Math.max(counts.cps || 0, getWatchCpsPlays());
+      if (options?.includeLocalCps) {
+        counts.cps = Math.max(counts.cps || 0, getWatchCpsPlays());
+      }
       return counts;
     }
 
-    function totalProfilePlays(profile) {
-      const counts = getProfilePlayCounts(profile);
-      return Object.values(counts).reduce((sum, value) => sum + (Number(value) || 0), 0) + getWatchCpsPlays();
+    function totalProfilePlays(profile, options) {
+      const counts = getProfilePlayCounts(profile, options);
+      return Object.values(counts).reduce((sum, value) => sum + (Number(value) || 0), 0);
     }
 
     function formatCpsBest() {
@@ -168,8 +170,8 @@
       return parseInt(localStorage.getItem('watchCpsPlays') || '0', 10) || 0;
     }
 
-    function profileGameRows(profile, statsByGame) {
-      const counts = getProfilePlayCounts(profile);
+    function profileGameRows(profile, statsByGame, options) {
+      const counts = getProfilePlayCounts(profile, options);
       const rows = [
         {
           label: 'Reaction Time',
@@ -189,7 +191,7 @@
         {
           label: 'Watch CPS',
           value: statsByGame.cps.best,
-          meta: getWatchCpsPlays() ? getWatchCpsPlays() + ' plays' : 'Watch only'
+          meta: counts.cps ? counts.cps + ' plays' : 'Watch only'
         }
       ];
       return rows.map(row => (
@@ -506,7 +508,7 @@
 
       const profileSnap = await db.collection('profiles').doc(currentUser.uid).get().catch(() => null);
       const profileData = profileSnap?.exists ? profileSnap.data() : {};
-      const counts = getProfilePlayCounts(profileData);
+      const counts = getProfilePlayCounts(profileData, { includeLocalCps: true });
       const statsByGame = {
         reaction: { best: null },
         aim: { best: null },
@@ -519,8 +521,8 @@
       statsByGame.reaction.best = reactionSnap?.exists ? reactionSnap.data().time : null;
       statsByGame.aim.best = aimSnap?.exists ? aimSnap.data().time : null;
 
-      const totalPlays = totalProfilePlays(profileData);
-      const mostPlayed = profileData.mostPlayedGame || mostPlayedGameFromProfile(profileData);
+      const totalPlays = totalProfilePlays(profileData, { includeLocalCps: true });
+      const mostPlayed = profileData.mostPlayedGame || mostPlayedGameFromProfile(profileData, { includeLocalCps: true });
       const reactionBest = statsByGame.reaction.best !== null ? gameConfigFor('reaction').scoreLabel(statsByGame.reaction.best) : '—';
       const aimBest = statsByGame.aim.best !== null ? gameConfigFor('aim').scoreLabel(statsByGame.aim.best) : '—';
       const chessPlays = counts.chess || 0;
@@ -555,7 +557,7 @@
           '<div class="stat-card"><div class="stat-val">'+escHtml(aimBest)+'</div><div class="stat-lbl">Aim best</div></div>'+
         '</div>'+
         '<div class="profile-section-title">Game overview</div>'+
-        '<div class="player-detail-list">'+profileGameRows(profileData, statsByGame)+'</div>'+
+        '<div class="player-detail-list">'+profileGameRows(profileData, statsByGame, { includeLocalCps: true })+'</div>'+
         '<div class="profile-section-title">Friends</div>'+
         '<div class="friends-search-row">'+
           '<input class="friends-search-input" id="friend-search-input" placeholder="Search by display name..." maxlength="30" oninput="onFriendSearch(this.value)">'+
@@ -722,4 +724,3 @@
       if(w) document.getElementById('mp-card-'+w).classList.add('winner');
       haptic('best');
     }
-

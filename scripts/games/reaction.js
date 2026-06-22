@@ -98,24 +98,40 @@
     let rankedMatchUnsub = null;
     let rankedMatchData = null;
     let rankedStatus = 'idle';
+    let rankedQueueJoinedAtMs = 0;
     let rankedStartTimer = null;
     let rankedStartedMatchId = null;
     let rankedReactionRound = 0;
     let chessLastMoveSquares = [];
     let chessLastMoveSan = '';
 
-    function getRankedClientSessionId() {
-      let id = sessionStorage.getItem('rankedClientSessionId');
+    function getRankedClientDeviceId() {
+      let id = localStorage.getItem('rankedClientDeviceId') || sessionStorage.getItem('rankedClientSessionId');
       if (!id) {
         id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-        sessionStorage.setItem('rankedClientSessionId', id);
       }
+      localStorage.setItem('rankedClientDeviceId', id);
       return id;
     }
 
     function currentRankedPlayerId() {
       if (!currentUser) return null;
-      return currentUser.uid + ':' + getRankedClientSessionId();
+      return currentUser.uid + ':' + getRankedClientDeviceId();
+    }
+
+    function rankedQueueDocIdFor(game, playerId) {
+      return game + '_' + playerId.replace(/[^a-zA-Z0-9:_-]/g, '-');
+    }
+
+    function setRankedQueueState(docId, joinedAtMs) {
+      rankedQueueDocId = docId;
+      rankedQueueJoinedAtMs = Number(joinedAtMs) || Date.now();
+      rankedStatus = 'queueing';
+    }
+
+    function clearRankedQueueState() {
+      rankedQueueDocId = null;
+      rankedQueueJoinedAtMs = 0;
     }
 
     function rankedOpponentId(data) {
@@ -277,7 +293,7 @@
         rankedMatchData = null;
         rankedStartedMatchId = null;
       }
-      rankedQueueDocId = null;
+      clearRankedQueueState();
       rankedStatus = keepMatch ? rankedStatus : 'idle';
       renderRankedPanel();
     }
@@ -326,7 +342,7 @@
       }
 
       if (rankedQueueDocId) {
-        const joinedAtMs = Number(sessionStorage.getItem('rankedQueueJoinedAtMs') || Date.now());
+        const joinedAtMs = rankedQueueJoinedAtMs || Date.now();
         statusVal.textContent = 'Queueing';
         rangeVal.textContent = '±' + rankedRangeFor(joinedAtMs);
         sub.textContent = 'Searching for a fair ' + gameConfig().title.toLowerCase() + ' match.';
@@ -375,9 +391,7 @@
       const game = activeGame;
       const joinedAtMs = Date.now();
       const playerId = currentRankedPlayerId();
-      rankedQueueDocId = game + '_' + playerId.replace(/[^a-zA-Z0-9:_-]/g, '-');
-      sessionStorage.setItem('rankedQueueJoinedAtMs', String(joinedAtMs));
-      rankedStatus = 'queueing';
+      setRankedQueueState(rankedQueueDocIdFor(game, playerId), joinedAtMs);
       renderRankedPanel();
       const ref = db.collection('rankedQueue').doc(rankedQueueDocId);
       await ref.set({
@@ -392,18 +406,24 @@
         expiresAtMs: joinedAtMs + RANKED_QUEUE_MS,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
+      watchRankedQueue(ref);
+      tryMatchmakeCurrentQueue();
+    }
+
+    function watchRankedQueue(ref) {
       clearRankedQueueWatcher();
       rankedQueueUnsub = ref.onSnapshot(snap => {
         if (!snap.exists) {
-          rankedQueueDocId = null;
+          clearRankedQueueState();
           rankedStatus = 'idle';
           renderRankedPanel();
           return;
         }
         const data = snap.data();
+        setRankedQueueState(snap.id, data.joinedAtMs);
         if (data.matchId) openRankedMatch(data.matchId);
         if (data.status === 'canceled' || data.status === 'expired') {
-          rankedQueueDocId = null;
+          clearRankedQueueState();
           rankedStatus = 'idle';
           clearRankedQueueWatcher();
         }
@@ -412,7 +432,6 @@
       rankedQueuePoll = setInterval(() => {
         if (rankedQueueDocId) tryMatchmakeCurrentQueue();
       }, 3500);
-      tryMatchmakeCurrentQueue();
     }
 
     async function cancelRankedQueue() {
@@ -425,13 +444,45 @@
       resetRankedState(false);
     }
 
+    async function expireRankedQueue(ref, data) {
+      if (!ref) return;
+      await ref.set({
+        playerId: data?.playerId || currentRankedPlayerId(),
+        uid: data?.uid || currentUser?.uid || null,
+        game: data?.game || activeGame,
+        rating: data?.rating || currentRankedRating(data?.game || activeGame),
+        name: data?.name || currentUser?.displayName || 'Player',
+        photoURL: data?.photoURL || currentUser?.photoURL || '',
+        joinedAtMs: data?.joinedAtMs || rankedQueueJoinedAtMs || Date.now(),
+        expiresAtMs: data?.expiresAtMs || Date.now(),
+        status: 'expired',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(() => {});
+      clearRankedQueueWatcher();
+      clearRankedQueueState();
+      rankedStatus = 'idle';
+      renderRankedPanel();
+    }
+
     async function tryMatchmakeCurrentQueue() {
       if (!currentUser || !rankedQueueDocId) return;
       const ownRef = db.collection('rankedQueue').doc(rankedQueueDocId);
       const ownSnap = await ownRef.get().catch(() => null);
-      if (!ownSnap?.exists) return;
+      if (!ownSnap?.exists) {
+        resetRankedState(false);
+        return;
+      }
       const own = ownSnap.data();
-      if (own.status !== 'searching' || own.game !== activeGame || own.expiresAtMs < Date.now()) return;
+      if (own.matchId) {
+        openRankedMatch(own.matchId);
+        return;
+      }
+      if (own.expiresAtMs < Date.now()) {
+        await expireRankedQueue(ownRef, own);
+        return;
+      }
+      if (own.status !== 'searching') return;
+      rankedQueueJoinedAtMs = own.joinedAtMs || rankedQueueJoinedAtMs;
       const range = rankedRangeFor(own.joinedAtMs);
       const candidatesSnap = await db.collection('rankedQueue')
         .where('game', '==', own.game)
@@ -484,8 +535,61 @@
         });
         openRankedMatch(matchRef.id);
       } catch (err) {
+        if (String(err?.message || '').includes('Queue expired')) {
+          await expireRankedQueue(ownRef, own);
+          return;
+        }
         console.error('Matchmaking retry:', err);
       }
+    }
+
+    async function restoreRankedSession() {
+      if (!currentUser) return;
+      const playerId = currentRankedPlayerId();
+      const games = Object.keys(GAME_CONFIG);
+      for (const game of games) {
+        const queueId = rankedQueueDocIdFor(game, playerId);
+        const ref = db.collection('rankedQueue').doc(queueId);
+        const snap = await ref.get().catch(() => null);
+        if (!snap?.exists) continue;
+        const data = snap.data();
+        if (data.uid !== currentUser.uid || data.playerId !== playerId) continue;
+        if (data.status === 'searching' && data.expiresAtMs > Date.now()) {
+          activeGame = game;
+          if (game !== 'cps') localStorage.setItem('activeGame', game);
+          setRankedQueueState(queueId, data.joinedAtMs);
+          applyActiveGameUi();
+          await loadActiveBest();
+          subscribeLeaderboard();
+          watchRankedQueue(ref);
+          renderRankedPanel();
+          return;
+        }
+        if (data.status === 'matched' && data.matchId) {
+          openRankedMatch(data.matchId);
+          return;
+        }
+        if (data.status === 'searching') {
+          await expireRankedQueue(ref, data);
+        }
+      }
+
+      const matchesSnap = await db.collection('rankedMatches')
+        .where('players', 'array-contains', playerId)
+        .limit(6)
+        .get()
+        .catch(() => null);
+      if (!matchesSnap?.docs?.length) {
+        renderRankedPanel();
+        return;
+      }
+      const match = matchesSnap.docs
+        .map(doc => ({ id: doc.id, data: doc.data() }))
+        .sort((a, b) => (b.data.createdAtMs || 0) - (a.data.createdAtMs || 0))
+        .find(entry => entry.data.state !== 'complete') || matchesSnap.docs
+        .map(doc => ({ id: doc.id, data: doc.data() }))
+        .sort((a, b) => (b.data.createdAtMs || 0) - (a.data.createdAtMs || 0))[0];
+      if (match) openRankedMatch(match.id);
     }
 
     function openRankedMatch(matchId) {
@@ -509,7 +613,7 @@
         }
       });
       clearRankedQueueWatcher();
-      rankedQueueDocId = null;
+      clearRankedQueueState();
     }
 
     async function processCompletedRankedMatch(matchId, data) {

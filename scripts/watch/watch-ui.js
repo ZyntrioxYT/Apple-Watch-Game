@@ -248,10 +248,10 @@
       document.getElementById('w-chess-last').textContent = lastMove ? 'Last: ' + lastMove : 'Say e2 to e4';
     }
 
-    function wChessTypeMove() {
+    async function wChessTypeMove() {
       const move = prompt('Move, like e2 to e4');
       if (!move) return;
-      const ok = playChessMoveText(move);
+      const ok = await playChessMoveText(move);
       renderWatchChess(ok ? move : 'Invalid move');
       if (!ok) haptic('early');
     }
@@ -264,9 +264,9 @@
       rec.interimResults = false;
       rec.maxAlternatives = 1;
       document.getElementById('w-chess-last').textContent = 'Listening...';
-      rec.onresult = event => {
+      rec.onresult = async event => {
         const spoken = event.results[0][0].transcript;
-        const ok = playChessMoveText(spoken);
+        const ok = await playChessMoveText(spoken);
         renderWatchChess(ok ? spoken : 'Invalid: ' + spoken);
         if (!ok) haptic('early');
       };

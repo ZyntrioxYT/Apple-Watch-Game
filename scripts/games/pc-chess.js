@@ -232,13 +232,13 @@
     }
 
     async function submitRankedChessMove(from, to) {
-      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== 'chess') return;
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== 'chess') return false;
       const ref = db.collection('rankedMatches').doc(rankedMatchId);
-      await db.runTransaction(async tx => {
+      const committed = await db.runTransaction(async tx => {
         const snap = await tx.get(ref);
-        if (!snap.exists) return;
+        if (!snap.exists) throw new Error('Match missing');
         const data = snap.data();
-        if (data.state === 'complete') return;
+        if (data.state === 'complete') throw new Error('Match complete');
         const payload = Object.assign({}, data.payload || {});
         const engine = createChessGame();
         if (payload.fen && payload.fen !== 'start') engine.load(payload.fen);
@@ -266,7 +266,12 @@
           };
         }
         tx.set(ref, update, { merge: true });
-      }).catch(err => console.error('Ranked chess move failed:', err));
+        return true;
+      }).catch(err => {
+        console.error('Ranked chess move failed:', err);
+        return false;
+      });
+      return committed;
     }
 
     function parseSpokenChessMove(text) {
@@ -288,13 +293,12 @@
       return squares && squares.length >= 2 ? { from: squares[0], to: squares[1] } : null;
     }
 
-    function playChessMoveText(text) {
+    async function playChessMoveText(text) {
       if (!chessGame) resetChessGame();
       const parsed = parseSpokenChessMove(text);
       if (!parsed) return false;
       if (isRankedLiveGame('chess')) {
-        submitRankedChessMove(parsed.from, parsed.to);
-        return true;
+        return await submitRankedChessMove(parsed.from, parsed.to);
       }
       const move = chessGame.move({ from: parsed.from, to: parsed.to, promotion: 'q' });
       if (!move) return false;
