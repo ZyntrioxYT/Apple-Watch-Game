@@ -83,7 +83,7 @@
       if (type==='best')  navigator.vibrate([15,8,15,8,35]);
     }
 
-    const DEFAULT_ELO = 1200;
+    const DEFAULT_ELO = 300;
     const RANKED_K = 24;
     const RANKED_BASE_RANGE = 120;
     const RANKED_STEP_RANGE = 70;
