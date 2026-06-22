@@ -241,17 +241,19 @@
     async function submitRankedArcadeResult(game, result) {
       if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== game) return;
       const ref = db.collection('rankedMatches').doc(rankedMatchId);
-      await db.runTransaction(async tx => {
+      const selfId = currentRankedPlayerId();
+      if (!selfId) return;
+      const matchCompleted = await db.runTransaction(async tx => {
         const snap = await tx.get(ref);
-        if (!snap.exists) return;
+        if (!snap.exists) return false;
         const data = snap.data();
-        if (data.state === 'complete') return;
+        if (data.state === 'complete') return true;
         const players = data.players || [];
         const scores = Object.assign({}, data.result?.scores || {});
-        scores[currentUser.uid] = result.score;
+        scores[selfId] = result.score;
         const payload = Object.assign({}, data.payload || {});
         const submissions = Object.assign({}, payload.submissions || {}, {
-          [currentUser.uid]: Object.assign({}, result, { finishedAtMs: Date.now() })
+          [selfId]: Object.assign({}, result, { finishedAtMs: Date.now() })
         });
         payload.submissions = submissions;
         const update = {
@@ -271,9 +273,13 @@
           };
         }
         tx.set(ref, update, { merge: true });
-      }).catch(err => console.error('Ranked result failed:', err));
+        return update.state === 'complete';
+      }).catch(err => {
+        console.error('Ranked result failed:', err);
+        return false;
+      });
+      if (matchCompleted) return;
       if (game === 'reaction') gameSub.textContent = 'Waiting for opponent...';
       if (game === 'aim') document.getElementById('aim-stats-bar').textContent = 'Waiting for opponent...';
       if (game === 'cps') document.getElementById('cps-sub').textContent = 'Waiting for opponent...';
     }
-
