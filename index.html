@@ -175,12 +175,35 @@
     .chess-square.dark { background:#5f7f5a; color:#151515; }
     .chess-square.selected { outline:3px solid var(--gold); outline-offset:-3px; }
     .chess-square.legal { box-shadow:inset 0 0 0 999px rgba(255,215,0,0.16); }
+    .chess-square.last-move { box-shadow:inset 0 0 0 999px rgba(77,184,255,0.24); }
+    .chess-square.last-move::after { content:''; position:absolute; inset:8%; border:2px solid rgba(255,255,255,0.8); border-radius:8px; pointer-events:none; }
     #chess-status { font-size:15px; font-weight:800; min-height:22px; margin-bottom:8px; }
     #chess-moves { width:min(86vw, 340px); max-height:120px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.55; }
     #chess-controls { display:flex; gap:8px; width:min(86vw, 340px); }
     #chess-bot-row { width:min(86vw, 340px); display:grid; grid-template-columns:repeat(4, 1fr); gap:5px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:12px; padding:3px; }
     .chess-bot-btn { border:none; border-radius:9px; background:transparent; color:var(--text-dim); font-size:12px; font-weight:700; padding:7px 4px; font-family:inherit; cursor:pointer; }
     .chess-bot-btn.active { background:rgba(255,255,255,0.1); color:white; }
+    #cps-panel { width:100%; max-width:340px; margin:0 auto; }
+    #cps-button { width:min(86vw, 340px); aspect-ratio:1; border:none; border-radius:24px; background:linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)); border:1px solid var(--border); color:white; font-size:clamp(30px, 8vw, 56px); font-weight:800; font-family:inherit; cursor:pointer; box-shadow:0 18px 40px rgba(0,0,0,0.22); }
+    #cps-button.running { background:linear-gradient(180deg, rgba(0,200,83,0.18), rgba(0,200,83,0.06)); border-color:rgba(0,200,83,0.28); }
+    #cps-info { font-size:15px; font-weight:800; min-height:22px; margin:10px 0 6px; }
+    #cps-sub { font-size:12px; color:var(--text-dim); min-height:18px; }
+    .ranked-panel { width:100%; margin-top:14px; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:18px; padding:14px; text-align:left; }
+    .ranked-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+    .ranked-title { font-size:14px; font-weight:800; }
+    .ranked-badge { font-size:11px; font-weight:800; padding:5px 9px; border-radius:999px; background:rgba(255,255,255,0.08); color:white; border:1px solid var(--border); }
+    .ranked-sub { font-size:12px; color:var(--text-dim); line-height:1.45; min-height:18px; }
+    .ranked-meta { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-top:12px; }
+    .ranked-meta-card { background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:10px; min-width:0; }
+    .ranked-meta-card .val { font-size:18px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ranked-meta-card .lbl { font-size:10px; color:var(--text-dim); margin-top:2px; }
+    .ranked-actions { display:flex; gap:8px; margin-top:12px; }
+    .ranked-actions .game-btn { margin:0; }
+    .ranked-note { margin-top:10px; font-size:11px; color:var(--text-dim); line-height:1.45; }
+    .ranked-opponent { margin-top:10px; font-size:12px; font-weight:700; color:white; }
+    .ranked-live { color:var(--green); }
+    .ranked-warn { color:var(--gold); }
+    .ranked-lose { color:#ff7b7b; }
     body.chess-mode #game-col-right { display:none !important; }
 
     /* ─── LEADERBOARD PAGE ──────────────────────────────────── */
@@ -589,6 +612,7 @@
     .w-chess-square { display:flex; align-items:center; justify-content:center; width:100%; height:100%; min-width:0; min-height:0; font-size:13px; line-height:1; font-family:"Times New Roman", serif; }
     .w-chess-square.light { background:#d8c9a3; color:#111; }
     .w-chess-square.dark { background:#6d8755; color:#111; }
+    .w-chess-square.last-move { box-shadow:inset 0 0 0 999px rgba(77,184,255,0.28); }
     #w-chess-controls { display:flex; gap:5px; }
     #w-chess-controls button { flex:1; border:none; border-radius:10px; padding:7px 4px; font-size:10px; font-weight:800; font-family:inherit; background:rgba(255,255,255,0.1); color:white; }
 
@@ -819,6 +843,18 @@
             <span class="game-pill">Local play</span>
           </div>
         </div>
+        <div class="game-card" onclick="selectGame('cps')">
+          <div class="game-card-icon">⚡</div>
+          <div>
+            <div class="game-card-title">CPS Test</div>
+            <div class="game-card-sub">Tap as fast as possible for 10 seconds. Ranked mode uses the same timer for both players.</div>
+          </div>
+          <div class="game-card-meta">
+            <span class="game-pill">10 Seconds</span>
+            <span class="game-pill">Ranked</span>
+            <span class="game-pill">Watch Ready</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -893,6 +929,12 @@
           </div>
         </div>
 
+        <div id="cps-panel" class="game-mode-panel hidden">
+          <button id="cps-button" onclick="handleCpsTap()">Start</button>
+          <div id="cps-info">10 second test</div>
+          <div id="cps-sub">Tap to begin</div>
+        </div>
+
         <div id="btn-row">
           <button class="game-btn" id="start-btn" onclick="startGame()">Start</button>
           <button class="game-btn" id="stop-btn" onclick="stopGame()">Stop</button>
@@ -901,6 +943,23 @@
         </div>
 
         <div id="guest-notice"></div>
+        <div id="ranked-panel" class="ranked-panel">
+          <div class="ranked-head">
+            <div class="ranked-title">Ranked Online</div>
+            <div class="ranked-badge" id="ranked-rating-badge">1200 Elo</div>
+          </div>
+          <div class="ranked-sub" id="ranked-sub">Sign in to queue for rated matches.</div>
+          <div class="ranked-opponent" id="ranked-opponent" style="display:none;"></div>
+          <div class="ranked-meta">
+            <div class="ranked-meta-card"><div class="val" id="ranked-status-val">Idle</div><div class="lbl">Status</div></div>
+            <div class="ranked-meta-card"><div class="val" id="ranked-range-val">±120</div><div class="lbl">Match range</div></div>
+          </div>
+          <div class="ranked-actions">
+            <button class="game-btn" id="ranked-queue-btn" onclick="toggleRankedQueue()">Find match</button>
+            <button class="game-btn" id="ranked-leave-btn" onclick="leaveRankedMatch()" style="display:none;">Forfeit</button>
+          </div>
+          <div class="ranked-note" id="ranked-note">Each game keeps its own Elo.</div>
+        </div>
       </div>
 
       <!-- right col: mini leaderboard on desktop -->
@@ -1025,7 +1084,7 @@
     // ── Tab navigation ────────────────────────────────────────
     function switchPage(name) {
       if (name === 'selector') stopGame();
-      if (name === 'lb' && activeGame === 'chess') name = 'game';
+      if (name === 'lb' && gameConfig().hasScores === false) name = 'game';
       document.body.classList.toggle('selector-mode', name === 'selector');
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
@@ -1057,6 +1116,12 @@
         localKey: 'aimLocalLeaderboard',
         scoreLabel: value => value + ' ms avg',
         rating: aimRatingFor
+      },
+      cps: {
+        title: 'CPS Test',
+        hasScores: false,
+        scoreLabel: value => value + ' CPS',
+        rating: cpsRatingFor
       },
       chess: {
         title: 'Chess',
@@ -1118,8 +1183,11 @@
         document.getElementById('user-info').style.display   = 'none';
         document.getElementById('guest-notice').textContent  = 'Guests can place on Today. Sign in for All Time.';
         allTimeBest = null;
+        resetRankedState(false);
       }
+      await loadRankedRatings();
       subscribeLeaderboard();
+      renderRankedPanel();
     });
 
     function signOut() { auth.signOut(); }
@@ -1211,11 +1279,11 @@
       if (!GAME_CONFIG[game]) return;
       stopGame();
       activeGame = game;
-      localStorage.setItem('activeGame', game);
+      if (game !== 'cps') localStorage.setItem('activeGame', game);
       applyActiveGameUi();
       await loadActiveBest();
       syncLbTabs();
-      if (gameConfig().hasScores !== false) subscribeLeaderboard();
+      subscribeLeaderboard();
       switchPage('game');
       document.getElementById('tab-selector')?.classList.add('active');
     }
@@ -1224,20 +1292,26 @@
       document.body.classList.toggle('chess-mode', activeGame === 'chess');
       document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
       document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');
+      document.getElementById('cps-panel').classList.toggle('hidden', activeGame !== 'cps');
       document.getElementById('chess-panel').classList.toggle('hidden', activeGame !== 'chess');
-      document.getElementById('difficulty-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
-      document.getElementById('btn-row').style.display = activeGame === 'chess' ? 'none' : 'flex';
+      document.getElementById('chess-bot-row').style.display = activeGame === 'chess' && !isRankedLiveGame('chess') ? 'grid' : 'none';
+      document.getElementById('difficulty-row').style.display = (activeGame === 'chess' || activeGame === 'cps') ? 'none' : 'flex';
+      document.getElementById('btn-row').style.display = (activeGame === 'chess' || activeGame === 'cps') ? 'none' : 'flex';
       document.getElementById('game-mode-title').textContent = gameConfig().title;
+      if (gameConfig().hasScores === false) {
+        clearUnsupportedLeaderboards();
+      }
       if (activeGame === 'chess') {
-        clearChessLeaderboards();
         initChessGame();
       }
+      if (activeGame === 'cps' && !isRankedLiveGame('cps')) resetCpsGame();
+      renderRankedPanel();
     }
 
-    function clearChessLeaderboards() {
+    function clearUnsupportedLeaderboards() {
       ['scores', 'scores-inline'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">Chess has no leaderboard</li>';
+        if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No ' + escHtml(gameConfig().title.toLowerCase()) + ' leaderboard</li>';
       });
     }
 
@@ -1267,26 +1341,53 @@
       try {
         const ctx = new(window.AudioContext||window.webkitAudioContext)();
         const now = ctx.currentTime;
-        const gain = ctx.createGain();
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(0.16, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        const master = ctx.createGain();
+        master.connect(ctx.destination);
+        master.gain.setValueAtTime(0.22, now);
+        master.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
-        const notes = [];
-        if (move && move.flags && move.flags.includes('c')) notes.push(260, 392);
-        else if (move && move.san && move.san.includes('#')) notes.push(196, 294, 392);
-        else if (move && move.san && move.san.includes('+')) notes.push(660, 990);
-        else if (move && move.flags && move.flags.includes('k')) notes.push(440, 660);
-        else notes.push(520);
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
+        const data = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+        }
 
-        notes.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(freq, now + i * 0.05);
-          osc.connect(gain);
-          osc.start(now + i * 0.05);
-          osc.stop(now + 0.12 + i * 0.05);
-        });
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(move?.captured ? 850 : 520, now);
+        noiseFilter.Q.value = 0.85;
+        noise.connect(noiseFilter);
+        noiseFilter.connect(master);
+        noise.start(now);
+        noise.stop(now + 0.09);
+
+        const body = ctx.createOscillator();
+        const bodyGain = ctx.createGain();
+        body.type = 'triangle';
+        body.frequency.setValueAtTime(move?.captured ? 180 : 130, now);
+        body.frequency.exponentialRampToValueAtTime(move?.captured ? 105 : 92, now + 0.12);
+        bodyGain.gain.setValueAtTime(move?.captured ? 0.1 : 0.07, now);
+        bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        body.connect(bodyGain);
+        bodyGain.connect(master);
+        body.start(now);
+        body.stop(now + 0.15);
+
+        if (move?.san?.includes('+') || move?.san?.includes('#')) {
+          const accent = ctx.createOscillator();
+          const accentGain = ctx.createGain();
+          accent.type = 'sine';
+          accent.frequency.setValueAtTime(740, now + 0.06);
+          accent.frequency.exponentialRampToValueAtTime(620, now + 0.14);
+          accentGain.gain.setValueAtTime(0.05, now + 0.06);
+          accentGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          accent.connect(accentGain);
+          accentGain.connect(master);
+          accent.start(now + 0.06);
+          accent.stop(now + 0.16);
+        }
       } catch (e) {}
     }
 
@@ -1297,6 +1398,454 @@
       if (type==='go')    navigator.vibrate([18,8,18]);
       if (type==='early') navigator.vibrate([50,20,50]);
       if (type==='best')  navigator.vibrate([15,8,15,8,35]);
+    }
+
+    const DEFAULT_ELO = 1200;
+    const RANKED_K = 24;
+    const RANKED_BASE_RANGE = 120;
+    const RANKED_STEP_RANGE = 70;
+    const RANKED_MAX_RANGE = 520;
+    const RANKED_QUEUE_MS = 90000;
+    const RANKED_MATCH_START_DELAY = 3500;
+    let rankedRatings = { reaction: DEFAULT_ELO, aim: DEFAULT_ELO, chess: DEFAULT_ELO, cps: DEFAULT_ELO };
+    let rankedQueueDocId = null;
+    let rankedQueueUnsub = null;
+    let rankedQueuePoll = null;
+    let rankedMatchId = null;
+    let rankedMatchUnsub = null;
+    let rankedMatchData = null;
+    let rankedStatus = 'idle';
+    let rankedStartTimer = null;
+    let rankedStartedMatchId = null;
+    let rankedReactionRound = 0;
+    let chessLastMoveSquares = [];
+    let chessLastMoveSan = '';
+
+    function currentRankedRating(game) {
+      return rankedRatings[game] || DEFAULT_ELO;
+    }
+
+    function rankedRangeFor(joinedAtMs) {
+      const wait = Math.max(0, Date.now() - (joinedAtMs || Date.now()));
+      return Math.min(RANKED_MAX_RANGE, RANKED_BASE_RANGE + Math.floor(wait / 5000) * RANKED_STEP_RANGE);
+    }
+
+    function expectedScore(me, opp) {
+      return 1 / (1 + Math.pow(10, (opp - me) / 400));
+    }
+
+    function calcNextElo(me, opp, score) {
+      return Math.round(me + RANKED_K * (score - expectedScore(me, opp)));
+    }
+
+    function rankedOpponentUid(data) {
+      if (!data?.players || !currentUser) return null;
+      return data.players.find(uid => uid !== currentUser.uid) || null;
+    }
+
+    function rankedOpponentName(data) {
+      const uid = rankedOpponentUid(data);
+      return uid ? (data?.playerNames?.[uid] || 'Opponent') : 'Opponent';
+    }
+
+    function rankedScoreLabel(game, score) {
+      if (score === null || score === undefined) return '—';
+      if (game === 'reaction' || game === 'aim') return Math.round(score) + ' ms';
+      if (game === 'cps') return Number(score).toFixed(1) + ' CPS';
+      return String(score);
+    }
+
+    function defaultRankedPayload(game, playerA, playerB) {
+      const startAtMs = Date.now() + RANKED_MATCH_START_DELAY;
+      if (game === 'reaction') {
+        return {
+          startAtMs,
+          roundCount: 5,
+          delays: Array.from({ length: 5 }, () => 1400 + Math.round(Math.random() * 2200)),
+          submissions: {}
+        };
+      }
+      if (game === 'aim') {
+        return {
+          startAtMs,
+          targetSize: 52,
+          totalTargets: 10,
+          positions: Array.from({ length: 10 }, () => ({
+            x: Number((0.15 + Math.random() * 0.7).toFixed(4)),
+            y: Number((0.15 + Math.random() * 0.7).toFixed(4))
+          })),
+          submissions: {}
+        };
+      }
+      if (game === 'cps') {
+        return {
+          startAtMs,
+          durationMs: 10000,
+          submissions: {}
+        };
+      }
+      const white = Math.random() > 0.5 ? playerA.uid : playerB.uid;
+      const black = white === playerA.uid ? playerB.uid : playerA.uid;
+      return {
+        startAtMs,
+        white,
+        black,
+        fen: 'start',
+        turn: 'w',
+        history: [],
+        lastMove: null
+      };
+    }
+
+    function rankedMatchDoc(game, playerA, playerB) {
+      return {
+        game,
+        mode: 'ranked',
+        state: 'active',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdAtMs: Date.now(),
+        players: [playerA.uid, playerB.uid],
+        playerNames: {
+          [playerA.uid]: playerA.name,
+          [playerB.uid]: playerB.name
+        },
+        playerPhotos: {
+          [playerA.uid]: playerA.photoURL || '',
+          [playerB.uid]: playerB.photoURL || ''
+        },
+        ratings: {
+          [playerA.uid]: playerA.rating,
+          [playerB.uid]: playerB.rating
+        },
+        result: null,
+        payload: defaultRankedPayload(game, playerA, playerB)
+      };
+    }
+
+    async function loadRankedRatings() {
+      if (!currentUser) {
+        rankedRatings = { reaction: DEFAULT_ELO, aim: DEFAULT_ELO, chess: DEFAULT_ELO, cps: DEFAULT_ELO };
+        renderRankedPanel();
+        return;
+      }
+      const snap = await db.collection('ratings').doc(currentUser.uid).get().catch(() => null);
+      const data = snap?.exists ? snap.data() : {};
+      rankedRatings = {
+        reaction: data?.reaction || DEFAULT_ELO,
+        aim: data?.aim || DEFAULT_ELO,
+        chess: data?.chess || DEFAULT_ELO,
+        cps: data?.cps || DEFAULT_ELO
+      };
+      renderRankedPanel();
+    }
+
+    function clearRankedQueueWatcher() {
+      if (rankedQueueUnsub) rankedQueueUnsub();
+      rankedQueueUnsub = null;
+      clearInterval(rankedQueuePoll);
+      rankedQueuePoll = null;
+    }
+
+    function clearRankedMatchWatcher() {
+      if (rankedMatchUnsub) rankedMatchUnsub();
+      rankedMatchUnsub = null;
+      clearTimeout(rankedStartTimer);
+      rankedStartTimer = null;
+    }
+
+    function resetRankedState(keepMatch) {
+      clearRankedQueueWatcher();
+      if (!keepMatch) {
+        clearRankedMatchWatcher();
+        rankedMatchId = null;
+        rankedMatchData = null;
+        rankedStartedMatchId = null;
+      }
+      rankedQueueDocId = null;
+      rankedStatus = keepMatch ? rankedStatus : 'idle';
+      renderRankedPanel();
+    }
+
+    function renderRankedPanel() {
+      const queueBtn = document.getElementById('ranked-queue-btn');
+      const leaveBtn = document.getElementById('ranked-leave-btn');
+      const ratingBadge = document.getElementById('ranked-rating-badge');
+      const sub = document.getElementById('ranked-sub');
+      const note = document.getElementById('ranked-note');
+      const statusVal = document.getElementById('ranked-status-val');
+      const rangeVal = document.getElementById('ranked-range-val');
+      const opponent = document.getElementById('ranked-opponent');
+      if (!queueBtn || !leaveBtn || !ratingBadge || !sub || !note || !statusVal || !rangeVal || !opponent) return;
+
+      ratingBadge.textContent = currentRankedRating(activeGame) + ' Elo';
+      if (!currentUser) {
+        statusVal.textContent = 'Sign in';
+        rangeVal.textContent = '±120';
+        sub.textContent = 'Sign in to queue for rated matches.';
+        note.textContent = 'Each game keeps its own Elo.';
+        queueBtn.textContent = 'Sign in';
+        queueBtn.disabled = false;
+        leaveBtn.style.display = 'none';
+        opponent.style.display = 'none';
+        return;
+      }
+
+      if (rankedMatchData && rankedMatchData.game === activeGame) {
+        const result = rankedMatchData.result;
+        const live = rankedMatchData.state !== 'complete';
+        statusVal.textContent = live ? 'Live' : 'Final';
+        rangeVal.textContent = '±' + Math.abs((rankedMatchData.ratings?.[currentUser.uid] || DEFAULT_ELO) - (rankedMatchData.ratings?.[rankedOpponentUid(rankedMatchData)] || DEFAULT_ELO));
+        sub.textContent = live ? 'Matched in ranked ' + gameConfig().title.toLowerCase() + '.' : (result?.text || 'Match complete.');
+        opponent.style.display = 'block';
+        opponent.textContent = 'Vs ' + rankedOpponentName(rankedMatchData);
+        queueBtn.textContent = live ? 'Matched' : 'Find next';
+        queueBtn.disabled = live;
+        leaveBtn.style.display = live ? 'block' : 'none';
+        note.textContent = result?.scores && rankedOpponentUid(rankedMatchData)
+          ? 'You: ' + rankedScoreLabel(activeGame, result.scores[currentUser.uid]) + ' · ' + rankedOpponentName(rankedMatchData) + ': ' + rankedScoreLabel(activeGame, result.scores[rankedOpponentUid(rankedMatchData)])
+          : 'Winner: ' + (result?.winner === 'draw' ? 'Draw' : result?.winner ? rankedMatchData.playerNames?.[result.winner] || 'Opponent' : 'Pending');
+        return;
+      }
+
+      if (rankedQueueDocId) {
+        const joinedAtMs = Number(sessionStorage.getItem('rankedQueueJoinedAtMs') || Date.now());
+        statusVal.textContent = 'Queueing';
+        rangeVal.textContent = '±' + rankedRangeFor(joinedAtMs);
+        sub.textContent = 'Searching for a fair ' + gameConfig().title.toLowerCase() + ' match.';
+        note.textContent = 'Range widens over time so you do not wait forever.';
+        queueBtn.textContent = 'Cancel';
+        queueBtn.disabled = false;
+        leaveBtn.style.display = 'none';
+        opponent.style.display = 'none';
+        return;
+      }
+
+      statusVal.textContent = 'Idle';
+      rangeVal.textContent = '±120';
+      sub.textContent = 'Queue for a rated ' + gameConfig().title.toLowerCase() + ' match.';
+      note.textContent = 'Each game keeps its own Elo.';
+      queueBtn.textContent = 'Find match';
+      queueBtn.disabled = false;
+      leaveBtn.style.display = 'none';
+      opponent.style.display = 'none';
+    }
+
+    function isRankedLiveGame(game) {
+      return rankedMatchData && rankedMatchData.game === game && rankedMatchData.state !== 'complete';
+    }
+
+    function activateRankedGame(game) {
+      if (!GAME_CONFIG[game]) return;
+      activeGame = game;
+      if (game !== 'cps') localStorage.setItem('activeGame', game);
+      applyActiveGameUi();
+      loadActiveBest();
+      subscribeLeaderboard();
+      switchPage('game');
+      document.getElementById('tab-selector')?.classList.add('active');
+    }
+
+    async function toggleRankedQueue() {
+      if (!currentUser) { openAuthModal(); return; }
+      if (rankedQueueDocId) { await cancelRankedQueue(); return; }
+      if (rankedMatchData && rankedMatchData.state !== 'complete') return;
+      await joinRankedQueue();
+    }
+
+    async function joinRankedQueue() {
+      await loadRankedRatings();
+      const game = activeGame;
+      const joinedAtMs = Date.now();
+      rankedQueueDocId = game + '_' + currentUser.uid;
+      sessionStorage.setItem('rankedQueueJoinedAtMs', String(joinedAtMs));
+      rankedStatus = 'queueing';
+      renderRankedPanel();
+      const ref = db.collection('rankedQueue').doc(rankedQueueDocId);
+      await ref.set({
+        uid: currentUser.uid,
+        game,
+        rating: currentRankedRating(game),
+        name: currentUser.displayName || 'Player',
+        photoURL: currentUser.photoURL || '',
+        status: 'searching',
+        joinedAtMs,
+        expiresAtMs: joinedAtMs + RANKED_QUEUE_MS,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      clearRankedQueueWatcher();
+      rankedQueueUnsub = ref.onSnapshot(snap => {
+        if (!snap.exists) {
+          rankedQueueDocId = null;
+          rankedStatus = 'idle';
+          renderRankedPanel();
+          return;
+        }
+        const data = snap.data();
+        if (data.matchId) openRankedMatch(data.matchId);
+        if (data.status === 'canceled' || data.status === 'expired') {
+          rankedQueueDocId = null;
+          rankedStatus = 'idle';
+          clearRankedQueueWatcher();
+        }
+        renderRankedPanel();
+      });
+      rankedQueuePoll = setInterval(() => {
+        if (rankedQueueDocId) tryMatchmakeCurrentQueue();
+      }, 3500);
+      tryMatchmakeCurrentQueue();
+    }
+
+    async function cancelRankedQueue() {
+      if (!currentUser || !rankedQueueDocId) return;
+      const ref = db.collection('rankedQueue').doc(rankedQueueDocId);
+      await ref.set({
+        status: 'canceled',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(() => {});
+      resetRankedState(false);
+    }
+
+    async function tryMatchmakeCurrentQueue() {
+      if (!currentUser || !rankedQueueDocId) return;
+      const ownRef = db.collection('rankedQueue').doc(rankedQueueDocId);
+      const ownSnap = await ownRef.get().catch(() => null);
+      if (!ownSnap?.exists) return;
+      const own = ownSnap.data();
+      if (own.status !== 'searching' || own.game !== activeGame || own.expiresAtMs < Date.now()) return;
+      const range = rankedRangeFor(own.joinedAtMs);
+      const candidatesSnap = await db.collection('rankedQueue')
+        .where('game', '==', own.game)
+        .where('status', '==', 'searching')
+        .limit(20)
+        .get()
+        .catch(() => null);
+      if (!candidatesSnap) return;
+      const candidates = candidatesSnap.docs
+        .filter(doc => doc.id !== rankedQueueDocId)
+        .map(doc => ({ id: doc.id, ref: doc.ref, data: doc.data() }))
+        .filter(row => row.data.expiresAtMs > Date.now())
+        .filter(row => Math.abs((row.data.rating || DEFAULT_ELO) - (own.rating || DEFAULT_ELO)) <= Math.max(range, rankedRangeFor(row.data.joinedAtMs)))
+        .sort((a, b) => {
+          const diffA = Math.abs((a.data.rating || DEFAULT_ELO) - (own.rating || DEFAULT_ELO));
+          const diffB = Math.abs((b.data.rating || DEFAULT_ELO) - (own.rating || DEFAULT_ELO));
+          if (diffA !== diffB) return diffA - diffB;
+          return (a.data.joinedAtMs || 0) - (b.data.joinedAtMs || 0);
+        });
+      if (!candidates.length) {
+        renderRankedPanel();
+        return;
+      }
+
+      const opponent = candidates[0];
+      const matchRef = db.collection('rankedMatches').doc();
+      try {
+        await db.runTransaction(async tx => {
+          const [freshOwn, freshOpp] = await Promise.all([tx.get(ownRef), tx.get(opponent.ref)]);
+          if (!freshOwn.exists || !freshOpp.exists) throw new Error('Queue disappeared');
+          const a = freshOwn.data();
+          const b = freshOpp.data();
+          if (a.status !== 'searching' || b.status !== 'searching') throw new Error('Already matched');
+          if (a.expiresAtMs < Date.now() || b.expiresAtMs < Date.now()) throw new Error('Queue expired');
+          tx.set(matchRef, rankedMatchDoc(a.game, {
+            uid: a.uid,
+            name: a.name,
+            photoURL: a.photoURL,
+            rating: a.rating || DEFAULT_ELO
+          }, {
+            uid: b.uid,
+            name: b.name,
+            photoURL: b.photoURL,
+            rating: b.rating || DEFAULT_ELO
+          }));
+          tx.set(ownRef, { status: 'matched', matchId: matchRef.id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          tx.set(opponent.ref, { status: 'matched', matchId: matchRef.id, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        });
+        openRankedMatch(matchRef.id);
+      } catch (err) {
+        console.error('Matchmaking retry:', err);
+      }
+    }
+
+    function openRankedMatch(matchId) {
+      if (!matchId || rankedMatchId === matchId) return;
+      clearRankedMatchWatcher();
+      rankedMatchId = matchId;
+      rankedMatchUnsub = db.collection('rankedMatches').doc(matchId).onSnapshot(async snap => {
+        if (!snap.exists) return;
+        rankedMatchData = snap.data();
+        rankedStatus = rankedMatchData.state === 'complete' ? 'complete' : 'live';
+        if (activeGame !== rankedMatchData.game || !document.getElementById('page-game').classList.contains('active')) {
+          activateRankedGame(rankedMatchData.game);
+        } else {
+          applyActiveGameUi();
+        }
+        if (rankedMatchData.game === 'chess') syncRankedChessGame();
+        scheduleRankedGameStart();
+        renderRankedPanel();
+        if (rankedMatchData.state === 'complete') {
+          await processCompletedRankedMatch(matchId, rankedMatchData);
+        }
+      });
+      clearRankedQueueWatcher();
+      rankedQueueDocId = null;
+    }
+
+    async function processCompletedRankedMatch(matchId, data) {
+      if (!currentUser || !data?.players?.includes(currentUser.uid)) return;
+      const ratingRef = db.collection('ratings').doc(currentUser.uid);
+      const snap = await ratingRef.get().catch(() => null);
+      const current = snap?.exists ? snap.data() : {};
+      const receipts = current.processedMatches || {};
+      if (receipts[matchId]) return;
+      const me = currentRankedRating(data.game);
+      const oppUid = rankedOpponentUid(data);
+      const myBase = data.ratings?.[currentUser.uid] || me;
+      const oppBase = data.ratings?.[oppUid] || DEFAULT_ELO;
+      let score = 0.5;
+      if (data.result?.winner === currentUser.uid) score = 1;
+      else if (data.result?.winner && data.result.winner !== 'draw') score = 0;
+      const next = calcNextElo(myBase, oppBase, score);
+      rankedRatings[data.game] = next;
+      await ratingRef.set({
+        [data.game]: next,
+        processedMatches: Object.assign({}, receipts, { [matchId]: true }),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => console.error('Rating save failed:', err));
+      renderRankedPanel();
+    }
+
+    async function leaveRankedMatch() {
+      if (!currentUser) return;
+      if (rankedQueueDocId) { await cancelRankedQueue(); return; }
+      if (!rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
+      const oppUid = rankedOpponentUid(rankedMatchData);
+      await db.collection('rankedMatches').doc(rankedMatchId).set({
+        state: 'complete',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        result: {
+          winner: oppUid || 'draw',
+          reason: 'forfeit',
+          text: (oppUid ? rankedMatchData.playerNames?.[oppUid] || 'Opponent' : 'Opponent') + ' wins by forfeit',
+          scores: rankedMatchData.result?.scores || {}
+        }
+      }, { merge: true }).catch(err => console.error('Forfeit failed:', err));
+    }
+
+    function scheduleRankedGameStart() {
+      clearTimeout(rankedStartTimer);
+      if (!rankedMatchData || rankedMatchData.state === 'complete') return;
+      const delay = Math.max(0, (rankedMatchData.payload?.startAtMs || Date.now()) - Date.now());
+      rankedStartTimer = setTimeout(() => startRankedGameIfNeeded(), delay + 10);
+    }
+
+    function startRankedGameIfNeeded() {
+      if (!rankedMatchData || rankedMatchData.state === 'complete' || rankedStartedMatchId === rankedMatchId) return;
+      rankedStartedMatchId = rankedMatchId;
+      if (rankedMatchData.game === 'reaction') startRankedReactionGame();
+      if (rankedMatchData.game === 'aim') startRankedAimGame();
+      if (rankedMatchData.game === 'cps') startRankedCpsGame();
+      if (rankedMatchData.game === 'chess') syncRankedChessGame();
     }
 
     // ── Bot mode (tap title 5x) ───────────────────────────────
@@ -1328,6 +1877,10 @@
     let sessionTimes=[];
     let timeout, nextRoundTimeout, windowTimeout;
     let allTimeBest = null;
+    let cpsRunning = false;
+    let cpsCount = 0;
+    let cpsEndsAt = 0;
+    let cpsTimer = null;
 
     const ringEl   = document.getElementById('watch-ring');
     const gameText = document.getElementById('game-text');
@@ -1337,18 +1890,23 @@
 
     function setGameState(state) {
       ringEl.className = 'state-' + state;
-      document.body.className = 'state-' + state;
+      document.body.classList.remove('state-idle', 'state-wait', 'state-go', 'state-result');
+      document.body.classList.add('state-' + state);
     }
 
     function startGame() {
+      if (activeGame === 'cps') { startCpsGame(); return; }
       if (activeGame === 'aim') { startAimGame(); return; }
+      if (isRankedLiveGame('reaction')) return;
       running=true; streak=0; sessionTimes=[];
       setArc(0);
       updateStatsBar(); nextRound();
     }
 
     function stopGame() {
+      if (activeGame === 'cps') { if (!isRankedLiveGame('cps')) resetCpsGame(); return; }
       if (activeGame === 'aim') { stopAimGame(); return; }
+      if (isRankedLiveGame('reaction')) return;
       running=false; waiting=false; ready=false;
       clearTimeout(timeout); clearTimeout(nextRoundTimeout); clearTimeout(windowTimeout);
       setGameState('idle');
@@ -1387,7 +1945,9 @@
     }
 
     function handleTap() {
+      if (activeGame === 'cps') { handleCpsTap(); return; }
       if (activeGame === 'aim') return;
+      if (isRankedLiveGame('reaction')) { handleRankedReactionTap(); return; }
       if (waiting && !ready) {
         clearTimeout(timeout); streak=0;
         setGameState('result'); gameText.textContent='Too early!'; gameSub.textContent='';
@@ -1427,6 +1987,79 @@
       }
     }
 
+    function startRankedReactionGame() {
+      running = true;
+      waiting = false;
+      ready = false;
+      streak = 0;
+      sessionTimes = [];
+      rankedReactionRound = 0;
+      setArc(0);
+      updateStatsBar();
+      nextRankedReactionRound();
+    }
+
+    function nextRankedReactionRound() {
+      if (!isRankedLiveGame('reaction')) return;
+      const payload = rankedMatchData.payload || {};
+      if (rankedReactionRound >= (payload.roundCount || 0)) {
+        submitRankedArcadeResult('reaction', {
+          rounds: sessionTimes.slice(),
+          score: Math.round(sessionTimes.reduce((sum, value) => sum + value, 0) / Math.max(1, sessionTimes.length))
+        });
+        return;
+      }
+      clearTimeout(nextRoundTimeout);
+      clearTimeout(windowTimeout);
+      setGameState('wait');
+      gameText.textContent = 'Wait...';
+      gameSub.textContent = 'Round ' + (rankedReactionRound + 1) + ' of ' + payload.roundCount;
+      setArc(0, 'var(--red, #e53935)');
+      waiting = true;
+      ready = false;
+      timeout = setTimeout(() => {
+        setGameState('go');
+        gameText.textContent = 'TAP!';
+        gameSub.textContent = 'Round ' + (rankedReactionRound + 1) + ' of ' + payload.roundCount;
+        setArc(1, 'var(--green)');
+        startTime = Date.now();
+        ready = true;
+        waiting = false;
+        haptic('go');
+      }, (payload.delays || [1500])[rankedReactionRound] || 1500);
+    }
+
+    function handleRankedReactionTap() {
+      if (!isRankedLiveGame('reaction')) return;
+      if (waiting && !ready) {
+        clearTimeout(timeout);
+        setGameState('result');
+        gameText.textContent = 'Too early!';
+        gameSub.textContent = 'Round resets';
+        setArc(0);
+        waiting = false;
+        ready = false;
+        haptic('early');
+        nextRoundTimeout = setTimeout(nextRankedReactionRound, 900);
+        return;
+      }
+      if (!ready) return;
+      const reaction = Date.now() - startTime;
+      clearTimeout(windowTimeout);
+      playTapSound();
+      haptic('tap');
+      sessionTimes.push(reaction);
+      setGameState('result');
+      gameText.textContent = reaction + ' ms';
+      gameSub.textContent = 'Saved';
+      setArc(Math.max(0, Math.min(1, 1 - (reaction - 150) / 350)));
+      rankedReactionRound++;
+      updateStatsBar();
+      waiting = false;
+      ready = false;
+      nextRoundTimeout = setTimeout(nextRankedReactionRound, 800);
+    }
+
     // ── Aim Trainer ─────────────────────────────────────────────
     let aimRunning = false;
     let aimHits = 0;
@@ -1455,6 +2088,7 @@
     }
 
     function startAimGame() {
+      if (isRankedLiveGame('aim')) return startRankedAimGame();
       aimRunning = true;
       aimHits = 0;
       aimMisses = 0;
@@ -1467,6 +2101,7 @@
     }
 
     function stopAimGame() {
+      if (isRankedLiveGame('aim')) return;
       aimRunning = false;
       const els = aimElements();
       els.target.classList.remove('show');
@@ -1478,9 +2113,22 @@
 
     function placeAimTarget() {
       if (!aimRunning) return;
-      const cfg = AIM_DIFFICULTY[difficulty];
       const els = aimElements();
       const rect = els.board.getBoundingClientRect();
+      if (isRankedLiveGame('aim')) {
+        const payload = rankedMatchData.payload || {};
+        const point = (payload.positions || [])[aimHits];
+        const size = payload.targetSize || 52;
+        const radius = size / 2;
+        els.target.style.width = size + 'px';
+        els.target.style.height = size + 'px';
+        els.target.style.left = (radius + (rect.width - size) * Math.min(1, Math.max(0, point?.x || 0.5))) + 'px';
+        els.target.style.top = (radius + (rect.height - size) * Math.min(1, Math.max(0, point?.y || 0.5))) + 'px';
+        els.target.classList.add('show');
+        aimTargetAt = Date.now();
+        return;
+      }
+      const cfg = AIM_DIFFICULTY[difficulty];
       const radius = cfg.size / 2;
       const x = radius + Math.random() * Math.max(1, rect.width - cfg.size);
       const y = radius + Math.random() * Math.max(1, rect.height - cfg.size);
@@ -1493,12 +2141,13 @@
     }
 
     function updateAimHud() {
-      const cfg = AIM_DIFFICULTY[difficulty];
+      const payload = rankedMatchData?.payload || {};
+      const totalTargets = isRankedLiveGame('aim') ? (payload.totalTargets || 10) : AIM_DIFFICULTY[difficulty].targets;
       const els = aimElements();
       const attempts = aimHits + aimMisses;
       const avg = aimTimes.length ? Math.round(aimTimes.reduce((a,b)=>a+b,0) / aimTimes.length) : null;
       const accuracy = attempts ? Math.round((aimHits / attempts) * 100) : 100;
-      els.hits.textContent = aimHits + '/' + cfg.targets;
+      els.hits.textContent = aimHits + '/' + totalTargets;
       els.avg.textContent = avg ? avg + 'ms' : '—';
       els.accuracy.textContent = accuracy + '%';
       els.stats.textContent = aimRunning ? 'Misses: ' + aimMisses : '';
@@ -1518,6 +2167,14 @@
       els.rating.textContent = rating.label;
       els.rating.style.color = rating.color;
       els.stats.textContent = 'Score: ' + score + 'ms avg' + (penalty ? ' · +' + penalty + 'ms misses' : '');
+      if (isRankedLiveGame('aim')) {
+        submitRankedArcadeResult('aim', {
+          score,
+          times: aimTimes.slice(),
+          misses: aimMisses
+        });
+        return;
+      }
       showRating(score);
       saveScore(score);
       checkAchievements();
@@ -1536,7 +2193,7 @@
       playTapSound();
       haptic('tap');
       updateAimHud();
-      if (aimHits >= AIM_DIFFICULTY[difficulty].targets) finishAimGame();
+      if (aimHits >= (isRankedLiveGame('aim') ? (rankedMatchData?.payload?.totalTargets || 10) : AIM_DIFFICULTY[difficulty].targets)) finishAimGame();
       else placeAimTarget();
     }
 
@@ -1545,6 +2202,141 @@
       aimMisses++;
       haptic('early');
       updateAimHud();
+    }
+
+    function startRankedAimGame() {
+      if (!isRankedLiveGame('aim')) return;
+      aimRunning = true;
+      aimHits = 0;
+      aimMisses = 0;
+      aimTimes = [];
+      const els = aimElements();
+      els.board.className = 'ready';
+      els.rating.textContent = '';
+      els.stats.textContent = 'Ranked match live';
+      updateAimHud();
+      placeAimTarget();
+    }
+
+    function cpsRatingFor(value) {
+      if (value >= 9) return { label:'Elite', color:'#ff4fc8' };
+      if (value >= 7.5) return { label:'Fast', color:'#00c853' };
+      if (value >= 6) return { label:'Sharp', color:'#4db8ff' };
+      if (value >= 4.5) return { label:'Steady', color:'#ffd700' };
+      return { label:'Warmup', color:'#ff7777' };
+    }
+
+    function resetCpsGame() {
+      cpsRunning = false;
+      cpsCount = 0;
+      clearInterval(cpsTimer);
+      cpsTimer = null;
+      document.getElementById('cps-button').textContent = 'Start';
+      document.getElementById('cps-button').classList.remove('running');
+      document.getElementById('cps-info').textContent = '10 second test';
+      document.getElementById('cps-sub').textContent = 'Tap to begin';
+    }
+
+    function startCpsGame() {
+      if (isRankedLiveGame('cps')) return startRankedCpsGame();
+      cpsRunning = true;
+      cpsCount = 0;
+      cpsEndsAt = Date.now() + 10000;
+      document.getElementById('cps-button').classList.add('running');
+      document.getElementById('cps-button').textContent = '0';
+      document.getElementById('cps-sub').textContent = 'Tap fast';
+      clearInterval(cpsTimer);
+      cpsTimer = setInterval(tickCpsGame, 100);
+      haptic('go');
+    }
+
+    function handleCpsTap() {
+      if (isRankedLiveGame('cps') && Date.now() < (rankedMatchData?.payload?.startAtMs || 0)) return;
+      if (!cpsRunning) {
+        startCpsGame();
+        return;
+      }
+      cpsCount++;
+      document.getElementById('cps-button').textContent = cpsCount;
+      haptic('tap');
+    }
+
+    function tickCpsGame() {
+      const left = Math.max(0, cpsEndsAt - Date.now());
+      document.getElementById('cps-info').textContent = (left / 1000).toFixed(1) + 's left';
+      if (left <= 0) finishCpsGame();
+    }
+
+    function finishCpsGame() {
+      clearInterval(cpsTimer);
+      cpsTimer = null;
+      cpsRunning = false;
+      const cps = Number((cpsCount / 10).toFixed(1));
+      const best = parseFloat(localStorage.getItem('watchCpsBest') || '0');
+      const rating = cpsRatingFor(cps);
+      localStorage.setItem('watchCpsPlays', String(getWatchCpsPlays() + 1));
+      if (cps > best) localStorage.setItem('watchCpsBest', String(cps));
+      document.getElementById('cps-button').textContent = cps.toFixed(1);
+      document.getElementById('cps-button').classList.remove('running');
+      document.getElementById('cps-info').textContent = rating.label;
+      document.getElementById('cps-sub').textContent = (cps > best ? 'New best' : 'Done') + ' · ' + cpsCount + ' taps';
+      if (isRankedLiveGame('cps')) {
+        submitRankedArcadeResult('cps', { score: cps, taps: cpsCount });
+        return;
+      }
+      haptic('best');
+    }
+
+    function startRankedCpsGame() {
+      if (!isRankedLiveGame('cps')) return;
+      cpsRunning = true;
+      cpsCount = 0;
+      cpsEndsAt = (rankedMatchData?.payload?.startAtMs || Date.now()) + (rankedMatchData?.payload?.durationMs || 10000);
+      document.getElementById('cps-button').classList.add('running');
+      document.getElementById('cps-button').textContent = '0';
+      document.getElementById('cps-info').textContent = '10.0s left';
+      document.getElementById('cps-sub').textContent = 'Ranked live';
+      clearInterval(cpsTimer);
+      cpsTimer = setInterval(tickCpsGame, 100);
+    }
+
+    async function submitRankedArcadeResult(game, result) {
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== game) return;
+      const ref = db.collection('rankedMatches').doc(rankedMatchId);
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return;
+        const data = snap.data();
+        if (data.state === 'complete') return;
+        const players = data.players || [];
+        const scores = Object.assign({}, data.result?.scores || {});
+        scores[currentUser.uid] = result.score;
+        const payload = Object.assign({}, data.payload || {});
+        const submissions = Object.assign({}, payload.submissions || {}, {
+          [currentUser.uid]: Object.assign({}, result, { finishedAtMs: Date.now() })
+        });
+        payload.submissions = submissions;
+        const update = {
+          payload,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if (players.every(uid => submissions[uid])) {
+          const [a, b] = players;
+          let winner = 'draw';
+          if (game === 'cps') winner = scores[a] === scores[b] ? 'draw' : (scores[a] > scores[b] ? a : b);
+          else winner = scores[a] === scores[b] ? 'draw' : (scores[a] < scores[b] ? a : b);
+          update.state = 'complete';
+          update.result = {
+            winner,
+            text: winner === 'draw' ? 'Draw' : (data.playerNames?.[winner] || 'Winner') + ' wins',
+            scores
+          };
+        }
+        tx.set(ref, update, { merge: true });
+      }).catch(err => console.error('Ranked result failed:', err));
+      if (game === 'reaction') gameSub.textContent = 'Waiting for opponent...';
+      if (game === 'aim') document.getElementById('aim-stats-bar').textContent = 'Waiting for opponent...';
+      if (game === 'cps') document.getElementById('cps-sub').textContent = 'Waiting for opponent...';
     }
 
     // ── Chess ───────────────────────────────────────────────────
@@ -1571,15 +2363,18 @@
     }
 
     function resetChessGame(recordPlay) {
+      if (isRankedLiveGame('chess')) return syncRankedChessGame();
       chessGame = createChessGame();
       chessSelected = null;
       chessBotThinking = false;
+      chessLastMoveSquares = [];
       if (recordPlay !== false) recordGamePlay('chess');
       renderChessBoard();
       renderWatchChess();
     }
 
     function setChessBot(level) {
+      if (isRankedLiveGame('chess')) return;
       chessBotLevel = level;
       document.querySelectorAll('.chess-bot-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.bot === level));
       resetChessGame();
@@ -1600,9 +2395,33 @@
     function chessStatusText() {
       if (!chessGame) return 'Chess engine unavailable';
       if (chessBotThinking) return 'Bot thinking...';
+      if (isRankedLiveGame('chess')) {
+        const mine = rankedMatchData?.payload?.white === currentUser?.uid ? 'w' : 'b';
+        if ((rankedMatchData?.payload?.turn || 'w') === mine) return chessGame.in_check() ? 'Your move, in check' : 'Your move';
+        return chessGame.in_check() ? 'Opponent to move, check on board' : 'Opponent to move';
+      }
       if (chessGame.in_checkmate()) return (chessGame.turn() === 'w' ? 'Black' : 'White') + ' wins by checkmate';
       if (chessGame.in_draw()) return 'Draw';
       return (chessGame.turn() === 'w' ? 'White' : 'Black') + (chessGame.in_check() ? ' in check' : ' to move');
+    }
+
+    function setChessLastMove(move) {
+      chessLastMoveSquares = move ? [move.from, move.to] : [];
+      chessLastMoveSan = move?.san || '';
+    }
+
+    function syncRankedChessGame() {
+      if (!rankedMatchData?.payload || rankedMatchData.game !== 'chess') return;
+      const incomingSan = rankedMatchData.payload.lastMove?.san || '';
+      const changedMove = incomingSan && incomingSan !== chessLastMoveSan;
+      chessSelected = null;
+      chessBotThinking = false;
+      chessGame = createChessGame();
+      if (chessGame && rankedMatchData.payload.fen && rankedMatchData.payload.fen !== 'start') chessGame.load(rankedMatchData.payload.fen);
+      setChessLastMove(rankedMatchData.payload.lastMove);
+      if (changedMove) playChessSound(rankedMatchData.payload.lastMove);
+      renderChessBoard();
+      renderWatchChess(rankedMatchData.payload.lastMove?.san);
     }
 
     function renderChessBoard() {
@@ -1623,6 +2442,7 @@
           btn.className = 'chess-square ' + ((f + r) % 2 === 0 ? 'light' : 'dark');
           if (square === chessSelected) btn.classList.add('selected');
           if (legalTargets.includes(square)) btn.classList.add('legal');
+          if (chessLastMoveSquares.includes(square)) btn.classList.add('last-move');
           btn.dataset.square = square;
           btn.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
           btn.addEventListener('click', () => handleChessSquare(square));
@@ -1630,11 +2450,11 @@
         }
       }
       document.getElementById('chess-status').textContent = chessStatusText();
-      const history = chessGame.history();
+      const history = isRankedLiveGame('chess') ? (rankedMatchData?.payload?.history || []) : chessGame.history();
       document.getElementById('chess-moves').innerHTML = '<strong style="color:white;">Moves</strong><br>' + (history.length ? escHtml(history.join(' ')) : 'No moves yet');
     }
 
-    function handleChessSquare(square) {
+    async function handleChessSquare(square) {
       if (!chessGame || chessGame.game_over() || chessBotThinking) return;
       if (isChessBotTurn()) return;
       const piece = chessGame.get(square);
@@ -1644,11 +2464,27 @@
         return;
       }
 
+      if (isRankedLiveGame('chess')) {
+        const from = chessSelected;
+        const preview = createChessGame();
+        if (preview && chessGame.fen() !== 'start') preview.load(chessGame.fen());
+        const move = preview?.move({ from, to: square, promotion: 'q' });
+        if (!move) {
+          chessSelected = piece && piece.color === chessGame.turn() ? square : null;
+          renderChessBoard();
+          return;
+        }
+        chessSelected = null;
+        await submitRankedChessMove(from, square);
+        return;
+      }
+
       const move = chessGame.move({ from: chessSelected, to: square, promotion: 'q' });
       if (!move) {
         chessSelected = piece && piece.color === chessGame.turn() ? square : null;
       } else {
         chessSelected = null;
+        setChessLastMove(move);
         playChessSound(move);
         haptic('tap');
         scheduleChessBotMove();
@@ -1662,6 +2498,7 @@
     }
 
     function isChessBotTurn() {
+      if (isRankedLiveGame('chess')) return false;
       return chessBotLevel !== 'none' && chessGame && chessGame.turn() === 'b' && !chessGame.game_over();
     }
 
@@ -1673,6 +2510,7 @@
         const move = chooseChessBotMove(chessBotLevel);
         const played = move ? chessGame.move(move) : null;
         chessBotThinking = false;
+        if (played) setChessLastMove(played);
         renderChessBoard();
         if (played) playChessSound(played);
         haptic('tap');
@@ -1734,6 +2572,43 @@
       return best || chooseMediumChessMove(moves);
     }
 
+    async function submitRankedChessMove(from, to) {
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== 'chess') return;
+      const ref = db.collection('rankedMatches').doc(rankedMatchId);
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return;
+        const data = snap.data();
+        if (data.state === 'complete') return;
+        const payload = Object.assign({}, data.payload || {});
+        const engine = createChessGame();
+        if (payload.fen && payload.fen !== 'start') engine.load(payload.fen);
+        const myColor = payload.white === currentUser.uid ? 'w' : 'b';
+        if ((payload.turn || 'w') !== myColor) throw new Error('Not your turn');
+        const move = engine.move({ from, to, promotion: 'q' });
+        if (!move) throw new Error('Illegal move');
+        payload.fen = engine.fen();
+        payload.turn = engine.turn();
+        payload.history = (payload.history || []).concat(move.san);
+        payload.lastMove = { from: move.from, to: move.to, san: move.san, by: currentUser.uid };
+        const update = {
+          payload,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if (engine.game_over()) {
+          let winner = 'draw';
+          if (engine.in_checkmate()) winner = engine.turn() === 'w' ? payload.black : payload.white;
+          update.state = 'complete';
+          update.result = {
+            winner,
+            text: winner === 'draw' ? 'Draw' : (data.playerNames?.[winner] || 'Winner') + ' wins',
+            scores: {}
+          };
+        }
+        tx.set(ref, update, { merge: true });
+      }).catch(err => console.error('Ranked chess move failed:', err));
+    }
+
     function parseSpokenChessMove(text) {
       const cleaned = String(text).toLowerCase()
         .replace(/won/g, 'one')
@@ -1757,9 +2632,14 @@
       if (!chessGame) resetChessGame();
       const parsed = parseSpokenChessMove(text);
       if (!parsed) return false;
+      if (isRankedLiveGame('chess')) {
+        submitRankedChessMove(parsed.from, parsed.to);
+        return true;
+      }
       const move = chessGame.move({ from: parsed.from, to: parsed.to, promotion: 'q' });
       if (!move) return false;
       chessSelected = null;
+      setChessLastMove(move);
       renderChessBoard();
       renderWatchChess(move.san);
       playChessSound(move);
@@ -1906,17 +2786,20 @@
       const reaction = counts.reaction || 0;
       const aim = counts.aim || 0;
       const chess = counts.chess || 0;
-      if (!reaction && !aim && !chess) return '—';
+      const cps = Math.max(counts.cps || 0, getWatchCpsPlays());
+      if (!reaction && !aim && !chess && !cps) return '—';
       const entries = [
         ['Reaction Time', reaction],
         ['Aim Trainer', aim],
-        ['Chess', chess]
+        ['Chess', chess],
+        ['CPS Test', cps]
       ];
       return entries.sort((a, b) => b[1] - a[1])[0][0];
     }
 
     function getProfilePlayCounts(profile) {
-      const counts = Object.assign({ reaction: 0, aim: 0, chess: 0 }, profile?.gamePlays || {});
+      const counts = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, profile?.gamePlays || {});
+      counts.cps = Math.max(counts.cps || 0, getWatchCpsPlays());
       return counts;
     }
 
@@ -1976,7 +2859,7 @@
       const ref = db.collection('profiles').doc(player.id);
       const snap = await ref.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
-      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0 }, current.gamePlays || {});
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, current.gamePlays || {});
       gamePlays[game] = (gamePlays[game] || 0) + 1;
       await ref.set({
         uid: player.uid,
@@ -1993,7 +2876,7 @@
       const ref = db.collection('profiles').doc(player.id);
       const snap = await ref.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
-      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0 }, current.gamePlays || {});
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, current.gamePlays || {});
       gamePlays[activeGame] = (gamePlays[activeGame] || 0) + 1;
       const profile = {
         uid: player.uid,
@@ -2010,7 +2893,9 @@
     async function getPlayerCardData(uid) {
       const [profileSnap, scoreSnap] = await Promise.all([
         db.collection('profiles').doc(uid).get().catch(() => null),
-        db.collection(gameConfig().scoreCollection).doc(uid).get().catch(() => null)
+        gameConfig().hasScores === false
+          ? Promise.resolve(null)
+          : db.collection(gameConfig().scoreCollection).doc(uid).get().catch(() => null)
       ]);
       const profile = profileSnap?.exists ? profileSnap.data() : {};
       const score = scoreSnap?.exists ? scoreSnap.data() : {};
@@ -2113,10 +2998,7 @@
     function subscribeLeaderboard() {
       if(lbUnsub) lbUnsub();
       if (gameConfig().hasScores === false) {
-        ['scores', 'scores-inline'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No chess leaderboard</li>';
-        });
+        clearUnsupportedLeaderboards();
         return;
       }
 
@@ -3238,8 +4120,8 @@
     }
 
     function wSelectGame(game) {
-      activeGame = game === 'aim' || game === 'chess' ? game : 'reaction';
-      if (game !== 'rush') localStorage.setItem('activeGame', activeGame);
+      activeGame = GAME_CONFIG[game] ? game : 'reaction';
+      if (game !== 'cps') localStorage.setItem('activeGame', activeGame);
       document.getElementById('w-selector-section').style.display = 'none';
       document.getElementById('w-dots').style.display = game === 'reaction' ? 'flex' : 'none';
       document.getElementById('w-game-section').style.display = game === 'reaction' ? 'flex' : 'none';
@@ -3446,6 +4328,7 @@
           const piece = chessGame.get(square);
           const cell = document.createElement('div');
           cell.className = 'w-chess-square ' + ((f + r) % 2 === 0 ? 'light' : 'dark');
+          if (chessLastMoveSquares.includes(square)) cell.classList.add('last-move');
           cell.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
           boardEl.appendChild(cell);
         }
