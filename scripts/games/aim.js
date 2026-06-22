@@ -241,13 +241,13 @@
     async function submitRankedArcadeResult(game, result) {
       if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.game !== game) return;
       const ref = db.collection('rankedMatches').doc(rankedMatchId);
-      const selfId = currentRankedPlayerId();
-      if (!selfId) return;
       const matchCompleted = await db.runTransaction(async tx => {
         const snap = await tx.get(ref);
         if (!snap.exists) return false;
         const data = snap.data();
         if (data.state === 'complete') return true;
+        const selfId = currentRankedMatchPlayerId(data);
+        if (!selfId) throw new Error('Player not in ranked match');
         const players = data.players || [];
         const scores = Object.assign({}, data.result?.scores || {});
         scores[selfId] = result.score;

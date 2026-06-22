@@ -134,10 +134,22 @@
       rankedQueueJoinedAtMs = 0;
     }
 
+    function currentRankedMatchPlayerId(data) {
+      if (!currentUser) return null;
+      const sessionId = currentRankedPlayerId();
+      const players = data?.players || [];
+      if (sessionId && players.includes(sessionId)) return sessionId;
+      if (players.includes(currentUser.uid)) return currentUser.uid;
+      if (sessionId && data?.playerUids?.[sessionId] === currentUser.uid) return sessionId;
+      const mapped = Object.keys(data?.playerUids || {}).find(id => data.playerUids[id] === currentUser.uid);
+      return mapped || null;
+    }
+
     function rankedOpponentId(data) {
-      const selfId = currentRankedPlayerId();
-      if (!data?.players || !selfId) return null;
-      return data.players.find(id => id !== selfId) || null;
+      const selfId = currentRankedMatchPlayerId(data);
+      const players = data?.players || Object.keys(data?.playerUids || {});
+      if (!players.length || !selfId) return null;
+      return players.find(id => id !== selfId) || null;
     }
 
     function currentRankedRating(game) {
@@ -159,19 +171,22 @@
 
     function rankedOpponentUid(data) {
       const opponentId = rankedOpponentId(data);
-      return opponentId ? (data?.playerUids?.[opponentId] || null) : null;
+      return opponentId ? (data?.playerUids?.[opponentId] || opponentId || null) : null;
     }
 
     function rankedOpponentName(data) {
       const opponentId = rankedOpponentId(data);
-      return opponentId ? (data?.playerNames?.[opponentId] || 'Opponent') : 'Opponent';
+      const opponentUid = rankedOpponentUid(data);
+      return opponentId ? (data?.playerNames?.[opponentId] || data?.playerNames?.[opponentUid] || 'Opponent') : 'Opponent';
     }
 
     function isSelfRankedMatch(data) {
       const opponentId = rankedOpponentId(data);
-      const selfId = currentRankedPlayerId();
+      const selfId = currentRankedMatchPlayerId(data);
       if (!selfId || !opponentId) return false;
-      return data?.playerUids?.[selfId] && data?.playerUids?.[selfId] === data?.playerUids?.[opponentId];
+      const selfUid = data?.playerUids?.[selfId] || selfId;
+      const oppUid = data?.playerUids?.[opponentId] || opponentId;
+      return !!selfUid && selfUid === oppUid;
     }
 
     function rankedScoreLabel(game, score) {
@@ -325,7 +340,7 @@
       if (rankedMatchData && rankedMatchData.game === activeGame) {
         const result = rankedMatchData.result;
         const live = rankedMatchData.state !== 'complete';
-        const selfId = currentRankedPlayerId();
+        const selfId = currentRankedMatchPlayerId(rankedMatchData);
         const oppId = rankedOpponentId(rankedMatchData);
         statusVal.textContent = live ? 'Live' : 'Final';
         rangeVal.textContent = '±' + Math.abs((rankedMatchData.ratings?.[selfId] || DEFAULT_ELO) - (rankedMatchData.ratings?.[oppId] || DEFAULT_ELO));
@@ -617,7 +632,7 @@
     }
 
     async function processCompletedRankedMatch(matchId, data) {
-      const selfId = currentRankedPlayerId();
+      const selfId = currentRankedMatchPlayerId(data);
       if (!currentUser || !selfId || !data?.players?.includes(selfId)) return;
       const ratingRef = db.collection('ratings').doc(currentUser.uid);
       const snap = await ratingRef.get().catch(() => null);

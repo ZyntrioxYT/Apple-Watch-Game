@@ -55,7 +55,7 @@
       if (!chessGame) return 'Chess engine unavailable';
       if (chessBotThinking) return 'Bot thinking...';
       if (isRankedLiveGame('chess')) {
-        const mine = rankedMatchData?.payload?.white === currentRankedPlayerId() ? 'w' : 'b';
+        const mine = rankedMatchData?.payload?.white === currentRankedMatchPlayerId(rankedMatchData) ? 'w' : 'b';
         if ((rankedMatchData?.payload?.turn || 'w') === mine) return chessGame.in_check() ? 'Your move, in check' : 'Your move';
         return chessGame.in_check() ? 'Opponent to move, check on board' : 'Opponent to move';
       }
@@ -242,7 +242,8 @@
         const payload = Object.assign({}, data.payload || {});
         const engine = createChessGame();
         if (payload.fen && payload.fen !== 'start') engine.load(payload.fen);
-        const selfId = currentRankedPlayerId();
+        const selfId = currentRankedMatchPlayerId(data);
+        if (!selfId) throw new Error('Player not in ranked match');
         const myColor = payload.white === selfId ? 'w' : 'b';
         if ((payload.turn || 'w') !== myColor) throw new Error('Not your turn');
         const move = engine.move({ from, to, promotion: 'q' });
