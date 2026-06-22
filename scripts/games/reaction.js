@@ -90,6 +90,8 @@
     const RANKED_MAX_RANGE = 520;
     const RANKED_QUEUE_MS = 90000;
     const RANKED_MATCH_START_DELAY = 3500;
+    const RANKED_PRESENCE_INTERVAL_MS = 4000;
+    const RANKED_PRESENCE_STALE_MS = 15000;
     let rankedRatings = { reaction: DEFAULT_ELO, aim: DEFAULT_ELO, chess: DEFAULT_ELO, cps: DEFAULT_ELO };
     let rankedQueueDocId = null;
     let rankedQueueUnsub = null;
@@ -101,6 +103,7 @@
     let rankedQueueJoinedAtMs = 0;
     let rankedStartTimer = null;
     let rankedStartedMatchId = null;
+    let rankedPresenceTimer = null;
     let rankedReactionRound = 0;
     let chessLastMoveSquares = [];
     let chessLastMoveSan = '';
@@ -298,6 +301,8 @@
       rankedMatchUnsub = null;
       clearTimeout(rankedStartTimer);
       rankedStartTimer = null;
+      clearInterval(rankedPresenceTimer);
+      rankedPresenceTimer = null;
     }
 
     function resetRankedState(keepMatch) {
@@ -381,6 +386,54 @@
 
     function isRankedLiveGame(game) {
       return rankedMatchData && rankedMatchData.game === game && rankedMatchData.state !== 'complete';
+    }
+
+    function rankedPresence() {
+      return Object.assign({}, rankedMatchData?.payload?.presence || {});
+    }
+
+    async function syncRankedPresence() {
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
+      const selfId = currentRankedMatchPlayerId(rankedMatchData);
+      if (!selfId) return;
+      const nextPresence = Object.assign({}, rankedPresence(), {
+        [selfId]: Date.now()
+      });
+      rankedMatchData.payload = Object.assign({}, rankedMatchData.payload || {}, { presence: nextPresence });
+      await db.collection('rankedMatches').doc(rankedMatchId).set({
+        payload: Object.assign({}, rankedMatchData.payload || {}, { presence: nextPresence }),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => console.error('Presence update failed:', err));
+    }
+
+    function watchRankedPresence() {
+      clearInterval(rankedPresenceTimer);
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
+      syncRankedPresence();
+      rankedPresenceTimer = setInterval(syncRankedPresence, RANKED_PRESENCE_INTERVAL_MS);
+    }
+
+    async function claimRankedForfeitFromPresence() {
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
+      const selfId = currentRankedMatchPlayerId(rankedMatchData);
+      const oppId = rankedOpponentId(rankedMatchData);
+      if (!selfId || !oppId) return;
+      const presence = rankedPresence();
+      const ownSeenAt = Number(presence[selfId] || 0);
+      const oppSeenAt = Number(presence[oppId] || 0);
+      const now = Date.now();
+      if (!ownSeenAt || now - ownSeenAt > RANKED_PRESENCE_STALE_MS) return;
+      if (!oppSeenAt || now - oppSeenAt <= RANKED_PRESENCE_STALE_MS) return;
+      await db.collection('rankedMatches').doc(rankedMatchId).set({
+        state: 'complete',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        result: {
+          winner: selfId,
+          reason: 'forfeit',
+          text: (rankedMatchData.playerNames?.[oppId] || 'Opponent') + ' forfeited',
+          scores: rankedMatchData.result?.scores || {}
+        }
+      }, { merge: true }).catch(err => console.error('Presence forfeit failed:', err));
     }
 
     function activateRankedGame(game) {
@@ -509,6 +562,7 @@
       const candidates = candidatesSnap.docs
         .filter(doc => doc.id !== rankedQueueDocId)
         .map(doc => ({ id: doc.id, ref: doc.ref, data: doc.data() }))
+        .filter(row => row.data.uid !== own.uid)
         .filter(row => row.data.expiresAtMs > Date.now())
         .filter(row => Math.abs((row.data.rating || DEFAULT_ELO) - (own.rating || DEFAULT_ELO)) <= Math.max(range, rankedRangeFor(row.data.joinedAtMs)))
         .sort((a, b) => {
@@ -531,6 +585,7 @@
           const a = freshOwn.data();
           const b = freshOpp.data();
           if (a.status !== 'searching' || b.status !== 'searching') throw new Error('Already matched');
+          if (a.uid === b.uid) throw new Error('Self match blocked');
           if (a.expiresAtMs < Date.now() || b.expiresAtMs < Date.now()) throw new Error('Queue expired');
           tx.set(matchRef, rankedMatchDoc(a.game, {
             playerId: a.playerId,
@@ -621,6 +676,8 @@
           applyActiveGameUi();
         }
         if (rankedMatchData.game === 'chess') syncRankedChessGame();
+        watchRankedPresence();
+        claimRankedForfeitFromPresence();
         scheduleRankedGameStart();
         renderRankedPanel();
         if (rankedMatchData.state === 'complete') {
@@ -664,7 +721,7 @@
       renderRankedPanel();
     }
 
-    async function leaveRankedMatch() {
+    async function leaveRankedMatch(reason) {
       if (!currentUser) return;
       if (rankedQueueDocId) { await cancelRankedQueue(); return; }
       if (!rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
@@ -675,10 +732,15 @@
         result: {
           winner: oppId || 'draw',
           reason: 'forfeit',
-          text: (oppId ? rankedMatchData.playerNames?.[oppId] || 'Opponent' : 'Opponent') + ' wins by forfeit',
+          text: (oppId ? rankedMatchData.playerNames?.[oppId] || 'Opponent' : 'Opponent') + (reason === 'left_match' ? ' wins after you left' : ' wins by forfeit'),
           scores: rankedMatchData.result?.scores || {}
         }
       }, { merge: true }).catch(err => console.error('Forfeit failed:', err));
+    }
+
+    function abandonRankedMatch(reason) {
+      if (!currentUser || !rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
+      leaveRankedMatch(reason || 'left_match');
     }
 
     function scheduleRankedGameStart() {
@@ -696,6 +758,8 @@
       if (rankedMatchData.game === 'cps') startRankedCpsGame();
       if (rankedMatchData.game === 'chess') syncRankedChessGame();
     }
+
+    window.addEventListener('pagehide', () => abandonRankedMatch('left_match'));
 
     // ── Bot mode (tap title 5x) ───────────────────────────────
     let botMode=false, titleTaps=0, titleTapTimer, botTapTimeout;

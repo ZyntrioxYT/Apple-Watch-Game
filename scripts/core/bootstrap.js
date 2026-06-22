@@ -12,6 +12,7 @@
 
     // ── Tab navigation ────────────────────────────────────────
     function switchPage(name) {
+      if (name !== 'game' && typeof abandonRankedMatch === 'function') abandonRankedMatch('left_match');
       if (name === 'selector') stopGame();
       if (name === 'lb' && gameConfig().hasScores === false) name = 'game';
       document.body.classList.toggle('selector-mode', name === 'selector');
@@ -120,7 +121,10 @@
       renderRankedPanel();
     });
 
-    function signOut() { auth.signOut(); }
+    async function signOut() {
+      if (typeof leaveRankedMatch === 'function') await leaveRankedMatch('left_match');
+      auth.signOut();
+    }
 
     // ── Auth modal ────────────────────────────────────────────
     let authMode = 'signin';
@@ -207,6 +211,7 @@
 
     async function selectGame(game) {
       if (!GAME_CONFIG[game]) return;
+      if (typeof abandonRankedMatch === 'function') abandonRankedMatch('left_match');
       stopGame();
       activeGame = game;
       if (game !== 'cps') localStorage.setItem('activeGame', game);
