@@ -104,6 +104,26 @@
     let chessLastMoveSquares = [];
     let chessLastMoveSan = '';
 
+    function getRankedClientSessionId() {
+      let id = sessionStorage.getItem('rankedClientSessionId');
+      if (!id) {
+        id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        sessionStorage.setItem('rankedClientSessionId', id);
+      }
+      return id;
+    }
+
+    function currentRankedPlayerId() {
+      if (!currentUser) return null;
+      return currentUser.uid + ':' + getRankedClientSessionId();
+    }
+
+    function rankedOpponentId(data) {
+      const selfId = currentRankedPlayerId();
+      if (!data?.players || !selfId) return null;
+      return data.players.find(id => id !== selfId) || null;
+    }
+
     function currentRankedRating(game) {
       return rankedRatings[game] || DEFAULT_ELO;
     }
@@ -122,13 +142,20 @@
     }
 
     function rankedOpponentUid(data) {
-      if (!data?.players || !currentUser) return null;
-      return data.players.find(uid => uid !== currentUser.uid) || null;
+      const opponentId = rankedOpponentId(data);
+      return opponentId ? (data?.playerUids?.[opponentId] || null) : null;
     }
 
     function rankedOpponentName(data) {
-      const uid = rankedOpponentUid(data);
-      return uid ? (data?.playerNames?.[uid] || 'Opponent') : 'Opponent';
+      const opponentId = rankedOpponentId(data);
+      return opponentId ? (data?.playerNames?.[opponentId] || 'Opponent') : 'Opponent';
+    }
+
+    function isSelfRankedMatch(data) {
+      const opponentId = rankedOpponentId(data);
+      const selfId = currentRankedPlayerId();
+      if (!selfId || !opponentId) return false;
+      return data?.playerUids?.[selfId] && data?.playerUids?.[selfId] === data?.playerUids?.[opponentId];
     }
 
     function rankedScoreLabel(game, score) {
@@ -167,8 +194,8 @@
           submissions: {}
         };
       }
-      const white = Math.random() > 0.5 ? playerA.uid : playerB.uid;
-      const black = white === playerA.uid ? playerB.uid : playerA.uid;
+      const white = Math.random() > 0.5 ? playerA.playerId : playerB.playerId;
+      const black = white === playerA.playerId ? playerB.playerId : playerA.playerId;
       return {
         startAtMs,
         white,
@@ -188,18 +215,23 @@
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdAtMs: Date.now(),
-        players: [playerA.uid, playerB.uid],
+        players: [playerA.playerId, playerB.playerId],
+        authorizedUids: [...new Set([playerA.uid, playerB.uid])],
+        playerUids: {
+          [playerA.playerId]: playerA.uid,
+          [playerB.playerId]: playerB.uid
+        },
         playerNames: {
-          [playerA.uid]: playerA.name,
-          [playerB.uid]: playerB.name
+          [playerA.playerId]: playerA.name,
+          [playerB.playerId]: playerB.name
         },
         playerPhotos: {
-          [playerA.uid]: playerA.photoURL || '',
-          [playerB.uid]: playerB.photoURL || ''
+          [playerA.playerId]: playerA.photoURL || '',
+          [playerB.playerId]: playerB.photoURL || ''
         },
         ratings: {
-          [playerA.uid]: playerA.rating,
-          [playerB.uid]: playerB.rating
+          [playerA.playerId]: playerA.rating,
+          [playerB.playerId]: playerA.uid === playerB.uid ? playerA.rating : playerB.rating
         },
         result: null,
         payload: defaultRankedPayload(game, playerA, playerB)
@@ -277,16 +309,18 @@
       if (rankedMatchData && rankedMatchData.game === activeGame) {
         const result = rankedMatchData.result;
         const live = rankedMatchData.state !== 'complete';
+        const selfId = currentRankedPlayerId();
+        const oppId = rankedOpponentId(rankedMatchData);
         statusVal.textContent = live ? 'Live' : 'Final';
-        rangeVal.textContent = '±' + Math.abs((rankedMatchData.ratings?.[currentUser.uid] || DEFAULT_ELO) - (rankedMatchData.ratings?.[rankedOpponentUid(rankedMatchData)] || DEFAULT_ELO));
+        rangeVal.textContent = '±' + Math.abs((rankedMatchData.ratings?.[selfId] || DEFAULT_ELO) - (rankedMatchData.ratings?.[oppId] || DEFAULT_ELO));
         sub.textContent = live ? 'Matched in ranked ' + gameConfig().title.toLowerCase() + '.' : (result?.text || 'Match complete.');
         opponent.style.display = 'block';
         opponent.textContent = 'Vs ' + rankedOpponentName(rankedMatchData);
         queueBtn.textContent = live ? 'Matched' : 'Find next';
         queueBtn.disabled = live;
         leaveBtn.style.display = live ? 'block' : 'none';
-        note.textContent = result?.scores && rankedOpponentUid(rankedMatchData)
-          ? 'You: ' + rankedScoreLabel(activeGame, result.scores[currentUser.uid]) + ' · ' + rankedOpponentName(rankedMatchData) + ': ' + rankedScoreLabel(activeGame, result.scores[rankedOpponentUid(rankedMatchData)])
+        note.textContent = result?.scores && oppId
+          ? 'You: ' + rankedScoreLabel(activeGame, result.scores[selfId]) + ' · ' + rankedOpponentName(rankedMatchData) + ': ' + rankedScoreLabel(activeGame, result.scores[oppId])
           : 'Winner: ' + (result?.winner === 'draw' ? 'Draw' : result?.winner ? rankedMatchData.playerNames?.[result.winner] || 'Opponent' : 'Pending');
         return;
       }
@@ -340,12 +374,14 @@
       await loadRankedRatings();
       const game = activeGame;
       const joinedAtMs = Date.now();
-      rankedQueueDocId = game + '_' + currentUser.uid;
+      const playerId = currentRankedPlayerId();
+      rankedQueueDocId = game + '_' + playerId.replace(/[^a-zA-Z0-9:_-]/g, '-');
       sessionStorage.setItem('rankedQueueJoinedAtMs', String(joinedAtMs));
       rankedStatus = 'queueing';
       renderRankedPanel();
       const ref = db.collection('rankedQueue').doc(rankedQueueDocId);
       await ref.set({
+        playerId,
         uid: currentUser.uid,
         game,
         rating: currentRankedRating(game),
@@ -431,11 +467,13 @@
           if (a.status !== 'searching' || b.status !== 'searching') throw new Error('Already matched');
           if (a.expiresAtMs < Date.now() || b.expiresAtMs < Date.now()) throw new Error('Queue expired');
           tx.set(matchRef, rankedMatchDoc(a.game, {
+            playerId: a.playerId,
             uid: a.uid,
             name: a.name,
             photoURL: a.photoURL,
             rating: a.rating || DEFAULT_ELO
           }, {
+            playerId: b.playerId,
             uid: b.uid,
             name: b.name,
             photoURL: b.photoURL,
@@ -475,18 +513,27 @@
     }
 
     async function processCompletedRankedMatch(matchId, data) {
-      if (!currentUser || !data?.players?.includes(currentUser.uid)) return;
+      const selfId = currentRankedPlayerId();
+      if (!currentUser || !selfId || !data?.players?.includes(selfId)) return;
       const ratingRef = db.collection('ratings').doc(currentUser.uid);
       const snap = await ratingRef.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
       const receipts = current.processedMatches || {};
       if (receipts[matchId]) return;
+      if (isSelfRankedMatch(data)) {
+        await ratingRef.set({
+          processedMatches: Object.assign({}, receipts, { [matchId]: true }),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(err => console.error('Rating receipt save failed:', err));
+        renderRankedPanel();
+        return;
+      }
       const me = currentRankedRating(data.game);
       const oppUid = rankedOpponentUid(data);
-      const myBase = data.ratings?.[currentUser.uid] || me;
-      const oppBase = data.ratings?.[oppUid] || DEFAULT_ELO;
+      const myBase = data.ratings?.[selfId] || me;
+      const oppBase = data.ratings?.[rankedOpponentId(data)] || DEFAULT_ELO;
       let score = 0.5;
-      if (data.result?.winner === currentUser.uid) score = 1;
+      if (data.result?.winner === selfId) score = 1;
       else if (data.result?.winner && data.result.winner !== 'draw') score = 0;
       const next = calcNextElo(myBase, oppBase, score);
       rankedRatings[data.game] = next;
@@ -502,14 +549,14 @@
       if (!currentUser) return;
       if (rankedQueueDocId) { await cancelRankedQueue(); return; }
       if (!rankedMatchId || !rankedMatchData || rankedMatchData.state === 'complete') return;
-      const oppUid = rankedOpponentUid(rankedMatchData);
+      const oppId = rankedOpponentId(rankedMatchData);
       await db.collection('rankedMatches').doc(rankedMatchId).set({
         state: 'complete',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         result: {
-          winner: oppUid || 'draw',
+          winner: oppId || 'draw',
           reason: 'forfeit',
-          text: (oppUid ? rankedMatchData.playerNames?.[oppUid] || 'Opponent' : 'Opponent') + ' wins by forfeit',
+          text: (oppId ? rankedMatchData.playerNames?.[oppId] || 'Opponent' : 'Opponent') + ' wins by forfeit',
           scores: rankedMatchData.result?.scores || {}
         }
       }, { merge: true }).catch(err => console.error('Forfeit failed:', err));
@@ -742,4 +789,3 @@
       ready = false;
       nextRoundTimeout = setTimeout(nextRankedReactionRound, 800);
     }
-

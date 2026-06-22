@@ -55,7 +55,7 @@
       if (!chessGame) return 'Chess engine unavailable';
       if (chessBotThinking) return 'Bot thinking...';
       if (isRankedLiveGame('chess')) {
-        const mine = rankedMatchData?.payload?.white === currentUser?.uid ? 'w' : 'b';
+        const mine = rankedMatchData?.payload?.white === currentRankedPlayerId() ? 'w' : 'b';
         if ((rankedMatchData?.payload?.turn || 'w') === mine) return chessGame.in_check() ? 'Your move, in check' : 'Your move';
         return chessGame.in_check() ? 'Opponent to move, check on board' : 'Opponent to move';
       }
@@ -242,14 +242,15 @@
         const payload = Object.assign({}, data.payload || {});
         const engine = createChessGame();
         if (payload.fen && payload.fen !== 'start') engine.load(payload.fen);
-        const myColor = payload.white === currentUser.uid ? 'w' : 'b';
+        const selfId = currentRankedPlayerId();
+        const myColor = payload.white === selfId ? 'w' : 'b';
         if ((payload.turn || 'w') !== myColor) throw new Error('Not your turn');
         const move = engine.move({ from, to, promotion: 'q' });
         if (!move) throw new Error('Illegal move');
         payload.fen = engine.fen();
         payload.turn = engine.turn();
         payload.history = (payload.history || []).concat(move.san);
-        payload.lastMove = { from: move.from, to: move.to, san: move.san, by: currentUser.uid };
+        payload.lastMove = { from: move.from, to: move.to, san: move.san, by: selfId };
         const update = {
           payload,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -306,4 +307,3 @@
       scheduleChessBotMove();
       return true;
     }
-
