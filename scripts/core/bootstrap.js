@@ -33,6 +33,7 @@
     let pendingPremiumGame = null;
     let unlockState = { aim: false, chess: false, chimp: false };
     const GUEST_ID_KEY = 'reactionGuestId';
+    const MASTER_UNLOCK_KEY = 'unlockAllGames';
     const GAME_CONFIG = {
       reaction: {
         title: 'Reaction Time',
@@ -185,6 +186,20 @@
       }
     }
 
+    function hasMasterUnlock() {
+      return localStorage.getItem(MASTER_UNLOCK_KEY) === '1';
+    }
+
+    function enableMasterUnlock() {
+      if (hasMasterUnlock()) return false;
+      localStorage.setItem(MASTER_UNLOCK_KEY, '1');
+      unlockState = { aim: true, chess: true, chimp: true };
+      renderUnlockProgress();
+      if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+      showAchieveToast({ icon: '🗝️', name: 'Everything unlocked.' });
+      return true;
+    }
+
     async function getBestScoreDoc(collection) {
       if (!currentUser) return null;
       const snap = await db.collection(collection).doc(currentUser.uid).get().catch(() => null);
@@ -192,6 +207,11 @@
     }
 
     async function loadUnlockState() {
+      if (hasMasterUnlock()) {
+        unlockState = { aim: true, chess: true, chimp: true };
+        renderUnlockProgress();
+        return;
+      }
       const reactionBest = Math.min(
         getLocalBestForKey('reactionLocalLeaderboard') ?? Infinity,
         (await getBestScoreDoc('scores')) ?? Infinity
@@ -244,6 +264,24 @@
 
     function openUnlockHelp() {
       showAchieveToast({ icon: '🔓', name: 'Reaction <= 300ms unlocks Aim. Aim <= 650ms unlocks Chess. Checkmate Med/Hard AI unlocks Chimp.' });
+    }
+
+    let selectorTitleTapCount = 0;
+    let selectorTitleTapTimer = null;
+
+    function handleSelectorTitleTap() {
+      clearTimeout(selectorTitleTapTimer);
+      selectorTitleTapCount += 1;
+      if (selectorTitleTapCount >= 7) {
+        selectorTitleTapCount = 0;
+        if (!enableMasterUnlock()) {
+          showAchieveToast({ icon: '🗝️', name: 'Everything is already unlocked.' });
+        }
+        return;
+      }
+      selectorTitleTapTimer = setTimeout(() => {
+        selectorTitleTapCount = 0;
+      }, 1200);
     }
 
     async function refreshGameUnlocks() {
@@ -445,3 +483,5 @@
         if (el) el.innerHTML = '<li id="lb-empty" style="color:var(--text-dim);font-size:13px;padding:16px;list-style:none;">No ' + escHtml(gameConfig().title.toLowerCase()) + ' leaderboard</li>';
       });
     }
+
+    document.getElementById('selector-title')?.addEventListener('click', handleSelectorTitleTap);
