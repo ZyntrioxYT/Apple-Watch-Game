@@ -532,6 +532,23 @@
       renderRankedPanel();
     }
 
+    async function clearMatchedQueueForMatch(matchId, matchData) {
+      if (!matchId || !matchData?.game || !Array.isArray(matchData.players)) return;
+      const writes = matchData.players.map(playerId => {
+        const ref = db.collection('rankedQueue').doc(rankedQueueDocIdFor(matchData.game, playerId));
+        return ref.get().then(snap => {
+          if (!snap.exists) return null;
+          const data = snap.data();
+          if (data.matchId !== matchId || data.status !== 'matched') return null;
+          return ref.set({
+            status: 'complete',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }).catch(() => null);
+      });
+      await Promise.all(writes);
+    }
+
     async function tryMatchmakeCurrentQueue() {
       if (!currentUser || !rankedQueueDocId) return;
       const ownRef = db.collection('rankedQueue').doc(rankedQueueDocId);
@@ -636,8 +653,21 @@
           return;
         }
         if (data.status === 'matched' && data.matchId) {
-          openRankedMatch(data.matchId);
-          return;
+          const matchSnap = await db.collection('rankedMatches').doc(data.matchId).get().catch(() => null);
+          if (matchSnap?.exists) {
+            const matchData = matchSnap.data();
+            if (matchData?.state !== 'complete') {
+              openRankedMatch(data.matchId);
+              return;
+            }
+            await clearMatchedQueueForMatch(data.matchId, matchData);
+          } else {
+            await ref.set({
+              status: 'canceled',
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true }).catch(() => {});
+          }
+          continue;
         }
         if (data.status === 'searching') {
           await expireRankedQueue(ref, data);
@@ -653,13 +683,16 @@
         renderRankedPanel();
         return;
       }
-      const match = matchesSnap.docs
+      const matches = matchesSnap.docs
         .map(doc => ({ id: doc.id, data: doc.data() }))
-        .sort((a, b) => (b.data.createdAtMs || 0) - (a.data.createdAtMs || 0))
-        .find(entry => entry.data.state !== 'complete') || matchesSnap.docs
-        .map(doc => ({ id: doc.id, data: doc.data() }))
-        .sort((a, b) => (b.data.createdAtMs || 0) - (a.data.createdAtMs || 0))[0];
-      if (match) openRankedMatch(match.id);
+        .sort((a, b) => (b.data.createdAtMs || 0) - (a.data.createdAtMs || 0));
+      const liveMatch = matches.find(entry => entry.data.state !== 'complete');
+      if (liveMatch) {
+        openRankedMatch(liveMatch.id);
+        return;
+      }
+      await Promise.all(matches.map(entry => clearMatchedQueueForMatch(entry.id, entry.data)));
+      renderRankedPanel();
     }
 
     function openRankedMatch(matchId) {
@@ -691,6 +724,7 @@
     async function processCompletedRankedMatch(matchId, data) {
       const selfId = currentRankedMatchPlayerId(data);
       if (!currentUser || !selfId || !data?.players?.includes(selfId)) return;
+      await clearMatchedQueueForMatch(matchId, data);
       const ratingRef = db.collection('ratings').doc(currentUser.uid);
       const snap = await ratingRef.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
