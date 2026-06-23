@@ -146,6 +146,7 @@
         setChessLastMove(move);
         playChessSound(move);
         haptic('tap');
+        maybeUnlockChimpFromChess();
         scheduleChessBotMove();
       }
       renderChessBoard();
@@ -159,6 +160,15 @@
     function isChessBotTurn() {
       if (isRankedLiveGame('chess')) return false;
       return chessBotLevel !== 'none' && chessGame && chessGame.turn() === 'b' && !chessGame.game_over();
+    }
+
+    function maybeUnlockChimpFromChess() {
+      if (!chessGame || !['medium', 'hard'].includes(chessBotLevel)) return;
+      if (!chessGame.game_over() || !chessGame.in_checkmate()) return;
+      if (chessGame.turn() !== 'b') return;
+      localStorage.setItem('chimpUnlocked', '1');
+      if (typeof refreshGameUnlocks === 'function') refreshGameUnlocks();
+      showAchieveToast({ icon: '🧠', name: 'Chimp Test unlocked' });
     }
 
     function scheduleChessBotMove() {

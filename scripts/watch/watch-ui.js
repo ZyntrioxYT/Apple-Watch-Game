@@ -31,6 +31,10 @@
     }
 
     function wSelectGame(game) {
+      if (typeof isGameUnlocked === 'function' && !isGameUnlocked(game)) {
+        if (typeof showAchieveToast === 'function') showAchieveToast({ icon: '🔒', name: unlockRequirementText(game) });
+        return;
+      }
       activeGame = GAME_CONFIG[game] ? game : 'reaction';
       if (game !== 'cps') localStorage.setItem('activeGame', activeGame);
       document.getElementById('w-selector-section').style.display = 'none';

@@ -31,6 +31,7 @@
     let activeGame = localStorage.getItem('activeGame') || 'reaction';
     let premiumState = { active: false, source: 'free', renewsAt: null };
     let pendingPremiumGame = null;
+    let unlockState = { aim: false, chess: false, chimp: false };
     const GUEST_ID_KEY = 'reactionGuestId';
     const GAME_CONFIG = {
       reaction: {
@@ -58,7 +59,6 @@
       chimp: {
         title: 'Chimp Test',
         hasScores: false,
-        premiumOnly: true,
         scoreLabel: value => 'Level ' + value,
         rating: () => ({ label: 'Memory', color: '#ffffff' })
       },
@@ -133,8 +133,8 @@
       if (title) title.textContent = 'Premium ' + premiumPriceLabel();
       if (sub) {
         const target = pendingPremiumGame && GAME_CONFIG[pendingPremiumGame]
-          ? 'Unlock ' + GAME_CONFIG[pendingPremiumGame].title + ' plus premium-only perks.'
-          : 'Unlock premium-only games, a premium badge, and deeper personal stats.';
+          ? 'Unlock a premium badge, deeper personal stats, and future paid extras.'
+          : 'Unlock a premium badge, deeper personal stats, and future paid extras.';
         sub.textContent = target;
       }
       if (status) status.textContent = premiumStatusText();
@@ -174,6 +174,86 @@
       if (hasPremiumAccess()) return true;
       openPremiumModal(game);
       return false;
+    }
+
+    function getLocalBestForKey(key) {
+      try {
+        const rows = JSON.parse(localStorage.getItem(key) || '[]');
+        return rows.length ? Math.min(...rows.map(row => Number(row.time) || Infinity)) : null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function getBestScoreDoc(collection) {
+      if (!currentUser) return null;
+      const snap = await db.collection(collection).doc(currentUser.uid).get().catch(() => null);
+      return snap?.exists ? Number(snap.data().time) : null;
+    }
+
+    async function loadUnlockState() {
+      const reactionBest = Math.min(
+        getLocalBestForKey('reactionLocalLeaderboard') ?? Infinity,
+        (await getBestScoreDoc('scores')) ?? Infinity
+      );
+      const aimBest = Math.min(
+        getLocalBestForKey('aimLocalLeaderboard') ?? Infinity,
+        (await getBestScoreDoc('aimScores')) ?? Infinity
+      );
+      unlockState = {
+        aim: reactionBest <= 300,
+        chess: aimBest <= 650,
+        chimp: localStorage.getItem('chimpUnlocked') === '1'
+      };
+      renderUnlockProgress();
+    }
+
+    function unlockRequirementText(game) {
+      if (game === 'aim') return 'Get 300ms or better in Reaction Time';
+      if (game === 'chess') return 'Get 650ms or better in Aim Trainer';
+      if (game === 'chimp') return 'Checkmate the AI on Med or Hard';
+      return '';
+    }
+
+    function defaultGameDescription(game) {
+      if (game === 'aim') return 'Hit every target as quickly as possible. Your score is average milliseconds per target.';
+      if (game === 'chess') return 'Play a full legal chess game. On Apple Watch, speak moves to avoid tiny-board misclicks.';
+      if (game === 'chimp') return 'Memorize flashed numbers, then tap the hidden tiles back in order as the sequence gets longer.';
+      return '';
+    }
+
+    function isGameUnlocked(game) {
+      if (game === 'reaction' || game === 'cps') return true;
+      return !!unlockState[game];
+    }
+
+    function renderUnlockProgress() {
+      const mappings = [
+        ['aim', unlockState.aim],
+        ['chess', unlockState.chess],
+        ['chimp', unlockState.chimp]
+      ];
+      mappings.forEach(([game, unlocked]) => {
+        const card = document.getElementById('game-card-' + game);
+        const sub = document.getElementById('game-card-sub-' + game);
+        if (!card) return;
+        card.classList.toggle('locked-card', !unlocked);
+        if (sub) sub.textContent = unlocked ? defaultGameDescription(game) : unlockRequirementText(game);
+      });
+    }
+
+    function openUnlockHelp() {
+      showAchieveToast({ icon: '🔓', name: 'Reaction <= 300ms unlocks Aim. Aim <= 650ms unlocks Chess. Checkmate Med/Hard AI unlocks Chimp.' });
+    }
+
+    async function refreshGameUnlocks() {
+      await loadUnlockState();
+      if (activeGame !== 'reaction' && activeGame !== 'cps' && !isGameUnlocked(activeGame)) {
+        activeGame = 'reaction';
+        localStorage.setItem('activeGame', activeGame);
+        applyActiveGameUi();
+      }
+      if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
     }
 
     function getGuestId() {
@@ -222,6 +302,7 @@
         resetRankedState(false);
       }
       await loadPremiumState();
+      await loadUnlockState();
       await loadRankedRatings();
       if (user) await restoreRankedSession();
       subscribeLeaderboard();
@@ -318,7 +399,10 @@
 
     async function selectGame(game) {
       if (!GAME_CONFIG[game]) return;
-      if (!ensurePremiumAccess(game)) return;
+      if (!isGameUnlocked(game)) {
+        showAchieveToast({ icon: '🔒', name: unlockRequirementText(game) });
+        return;
+      }
       if (typeof abandonRankedMatch === 'function') abandonRankedMatch('left_match');
       stopGame();
       activeGame = game;
@@ -332,7 +416,6 @@
     }
 
     function applyActiveGameUi() {
-      if (gameConfig().premiumOnly && !hasPremiumAccess()) activeGame = 'reaction';
       document.body.classList.toggle('chess-mode', activeGame === 'chess');
       document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
       document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');

@@ -556,7 +556,7 @@
             '<div class="stat-card"><div class="stat-val">'+aimLocalEntries+'</div><div class="stat-lbl">Aim local entries</div></div>'+
             '<div class="stat-card"><div class="stat-val">'+(typeof getChimpLocalPlays === "function" ? getChimpLocalPlays() : 0)+'</div><div class="stat-lbl">Chimp runs</div></div>'+
           '</div>'
-        : '<div class="premium-locked-copy">Premium unlocks Chimp Test and extra personal stats.</div>';
+        : '<div class="premium-locked-copy">Premium is reserved for extra personal stats, cosmetics, and future paid extras.</div>';
 
       // achievements
       checkAchievements();

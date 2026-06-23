@@ -193,9 +193,9 @@
       <div class="modal-handle"></div>
       <div class="premium-modal-badge">PREMIUM</div>
       <h2 id="premium-modal-title">Premium £2.99/mo</h2>
-      <p id="premium-modal-sub" class="premium-modal-sub">Unlock premium-only games, a premium badge, and deeper personal stats.</p>
+      <p id="premium-modal-sub" class="premium-modal-sub">Unlock a premium badge, deeper personal stats, and future paid extras.</p>
       <div class="premium-benefits">
-        <div class="premium-benefit"><span>♛</span><div><strong>Premium-only games</strong><span>Chimp Test and future releases.</span></div></div>
+        <div class="premium-benefit"><span>♛</span><div><strong>Future premium drops</strong><span>Reserved for future paid content and cosmetics.</span></div></div>
         <div class="premium-benefit"><span>★</span><div><strong>Premium badge</strong><span>Stand out on your profile and account card.</span></div></div>
         <div class="premium-benefit"><span>▣</span><div><strong>Extra stats</strong><span>Get added personal performance insights.</span></div></div>
       </div>
@@ -215,13 +215,13 @@
       </div>
       <div class="premium-strip">
         <div>
-          <div class="premium-strip-title">Premium</div>
-          <div class="premium-strip-sub">£2.99/month for premium-only games and extra stats.</div>
+          <div class="premium-strip-title">Progression</div>
+          <div class="premium-strip-sub">Start with Reaction Time and unlock more games by hitting better scores.</div>
         </div>
-        <button class="premium-strip-btn" onclick="openPremiumModal()">View</button>
+        <button class="premium-strip-btn" onclick="openUnlockHelp()">View</button>
       </div>
       <div class="selector-grid">
-        <div class="game-card" onclick="selectGame('reaction')">
+        <div class="game-card" id="game-card-reaction" onclick="selectGame('reaction')">
           <div class="game-card-icon">⏱</div>
           <div>
             <div class="game-card-title">Reaction Time</div>
@@ -233,11 +233,11 @@
             <span class="game-pill">Challenges</span>
           </div>
         </div>
-        <div class="game-card" onclick="selectGame('aim')">
+        <div class="game-card" id="game-card-aim" onclick="selectGame('aim')">
           <div class="game-card-icon">◎</div>
           <div>
             <div class="game-card-title">Aim Trainer</div>
-            <div class="game-card-sub">Hit every target as quickly as possible. Your score is average milliseconds per target.</div>
+            <div class="game-card-sub" id="game-card-sub-aim">Hit every target as quickly as possible. Your score is average milliseconds per target.</div>
           </div>
           <div class="game-card-meta">
             <span class="game-pill">Accuracy</span>
@@ -245,11 +245,11 @@
             <span class="game-pill">Friends</span>
           </div>
         </div>
-        <div class="game-card" onclick="selectGame('chess')">
+        <div class="game-card" id="game-card-chess" onclick="selectGame('chess')">
           <div class="game-card-icon">♟</div>
           <div>
             <div class="game-card-title">Chess</div>
-            <div class="game-card-sub">Play a full legal chess game. On Apple Watch, speak moves to avoid tiny-board misclicks.</div>
+            <div class="game-card-sub" id="game-card-sub-chess">Play a full legal chess game. On Apple Watch, speak moves to avoid tiny-board misclicks.</div>
           </div>
           <div class="game-card-meta">
             <span class="game-pill">Legal moves</span>
@@ -269,15 +269,15 @@
             <span class="game-pill">Watch Ready</span>
           </div>
         </div>
-        <div class="game-card premium-card" onclick="selectGame('chimp')">
+        <div class="game-card premium-card" id="game-card-chimp" onclick="selectGame('chimp')">
           <div class="game-card-icon premium-icon">🧠</div>
           <div>
-            <div class="game-card-title">Chimp Test <span class="premium-tag-inline">Premium</span></div>
-            <div class="game-card-sub">Memorize flashed numbers, then tap the hidden tiles back in order as the sequence gets longer.</div>
+            <div class="game-card-title">Chimp Test <span class="premium-tag-inline">Unlockable</span></div>
+            <div class="game-card-sub" id="game-card-sub-chimp">Memorize flashed numbers, then tap the hidden tiles back in order as the sequence gets longer.</div>
           </div>
           <div class="game-card-meta">
             <span class="game-pill">Working Memory</span>
-            <span class="game-pill">Premium</span>
+            <span class="game-pill">Unlockable</span>
             <span class="game-pill">Fast Recall</span>
           </div>
         </div>
