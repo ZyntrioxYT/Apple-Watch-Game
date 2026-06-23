@@ -484,4 +484,4 @@
       });
     }
 
-    document.getElementById('selector-title')?.addEventListener('click', handleSelectorTitleTap);
+    document.getElementById('selector-title')?.addEventListener('touchstart', handleSelectorTitleTap, { passive: true });
