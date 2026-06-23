@@ -4,12 +4,10 @@
     let chessFlipped = false;
     let chessBotLevel = 'none';
     let chessBotThinking = false;
+    let chessBotTimeout = null;
 
-    const CHESS_PIECES = {
-      wp:'♙', wn:'♘', wb:'♗', wr:'♖', wq:'♕', wk:'♔',
-      bp:'♟', bn:'♞', bb:'♝', br:'♜', bq:'♛', bk:'♚'
-    };
     const CHESS_VALUES = { p:100, n:320, b:330, r:500, q:900, k:0 };
+    const CHESS_LABELS = { p:'P', n:'N', b:'B', r:'R', q:'Q', k:'K' };
 
     function createChessGame() {
       if (typeof Chess !== 'function') return null;
@@ -26,6 +24,8 @@
       chessGame = createChessGame();
       chessSelected = null;
       chessBotThinking = false;
+      clearTimeout(chessBotTimeout);
+      chessBotTimeout = null;
       chessLastMoveSquares = [];
       if (recordPlay !== false) recordGamePlay('chess');
       renderChessBoard();
@@ -69,6 +69,39 @@
       chessLastMoveSan = move?.san || '';
     }
 
+    function chessPieceMarkup(piece, compact) {
+      if (!piece) return '';
+      const fill = piece.color === 'w' ? '#f8f3e4' : '#1d2430';
+      const stroke = piece.color === 'w' ? '#20242d' : '#dfe6ef';
+      const accent = piece.color === 'w' ? '#c7a763' : '#6fb5ff';
+      const label = CHESS_LABELS[piece.type] || '?';
+      const cls = compact ? 'w-chess-piece-svg' : 'chess-piece-svg';
+      const emblem = piece.type === 'k'
+        ? '<path d="M30 18h10M35 13v10" stroke="' + stroke + '" stroke-width="2.6" stroke-linecap="round"/>'
+        : piece.type === 'q'
+          ? '<circle cx="24" cy="18" r="2.2" fill="' + accent + '"/><circle cx="35" cy="15" r="2.2" fill="' + accent + '"/><circle cx="46" cy="18" r="2.2" fill="' + accent + '"/>'
+          : piece.type === 'r'
+            ? '<path d="M22 15h26v8H22zM26 11h4v4h-4zM33 11h4v4h-4zM40 11h4v4h-4z" fill="' + accent + '" opacity="0.95"/>'
+            : piece.type === 'b'
+              ? '<path d="M35 11c4 4 4 8 0 12M35 11c-4 4-4 8 0 12" stroke="' + accent + '" stroke-width="2.4" stroke-linecap="round"/><circle cx="35" cy="10" r="2" fill="' + accent + '"/>'
+              : piece.type === 'n'
+                ? '<path d="M24 24c2-9 10-13 18-13l4 7-5 2 5 7c-4 2-8 3-11 3-5 0-9-2-11-6z" fill="' + accent + '" opacity="0.95"/>'
+              : '<circle cx="35" cy="17" r="5" fill="' + accent + '" opacity="0.95"/>';
+      return ''
+        + '<svg class="' + cls + '" viewBox="0 0 70 70" aria-hidden="true">'
+        + '<rect x="10" y="12" width="50" height="46" rx="14" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4"/>'
+        + emblem
+        + '<text x="35" y="47" text-anchor="middle" font-size="24" font-weight="800" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif" fill="' + stroke + '">' + label + '</text>'
+        + '</svg>';
+    }
+
+    function syncChessHistoryState() {
+      if (!chessGame) return;
+      const history = chessGame.history({ verbose: true });
+      const last = history.length ? history[history.length - 1] : null;
+      setChessLastMove(last || null);
+    }
+
     function syncRankedChessGame() {
       if (!rankedMatchData?.payload || rankedMatchData.game !== 'chess') return;
       const incomingSan = rankedMatchData.payload.lastMove?.san || '';
@@ -103,7 +136,7 @@
           if (legalTargets.includes(square)) btn.classList.add('legal');
           if (chessLastMoveSquares.includes(square)) btn.classList.add('last-move');
           btn.dataset.square = square;
-          btn.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
+          btn.innerHTML = piece ? chessPieceMarkup(piece, false) : '';
           btn.addEventListener('click', () => handleChessSquare(square));
           boardEl.appendChild(btn);
         }
@@ -175,10 +208,12 @@
       if (!isChessBotTurn()) return;
       chessBotThinking = true;
       renderChessBoard();
-      setTimeout(() => {
+      clearTimeout(chessBotTimeout);
+      chessBotTimeout = setTimeout(() => {
         const move = chooseChessBotMove(chessBotLevel);
         const played = move ? chessGame.move(move) : null;
         chessBotThinking = false;
+        chessBotTimeout = null;
         if (played) setChessLastMove(played);
         renderChessBoard();
         if (played) playChessSound(played);
@@ -239,6 +274,22 @@
         }
       });
       return best || chooseMediumChessMove(moves);
+    }
+
+    function undoChessMove() {
+      if (isRankedLiveGame('chess') || !chessGame) return false;
+      clearTimeout(chessBotTimeout);
+      chessBotTimeout = null;
+      chessBotThinking = false;
+      const undoCount = chessBotLevel !== 'none' ? 2 : 1;
+      let undone = 0;
+      while (undone < undoCount && chessGame.undo()) undone++;
+      if (!undone) return false;
+      chessSelected = null;
+      syncChessHistoryState();
+      renderChessBoard();
+      renderWatchChess(chessLastMoveSan || '');
+      return true;
     }
 
     async function submitRankedChessMove(from, to) {

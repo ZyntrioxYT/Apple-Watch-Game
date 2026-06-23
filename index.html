@@ -61,6 +61,7 @@
       <div id="w-chess-controls">
         <button onclick="wChessListen()">Speak</button>
         <button onclick="wChessTypeMove()">Type</button>
+        <button onclick="undoChessMove()">Undo</button>
         <button onclick="resetChessGame()">New</button>
       </div>
     </div>
@@ -352,6 +353,7 @@
           </div>
           <div id="chess-controls">
             <button class="game-btn" onclick="resetChessGame()">New game</button>
+            <button class="game-btn" onclick="undoChessMove()">Undo</button>
             <button class="game-btn icon-btn" onclick="flipChessBoard()" title="Flip board">↕</button>
           </div>
         </div>

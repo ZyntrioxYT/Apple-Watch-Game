@@ -244,7 +244,7 @@
           const cell = document.createElement('div');
           cell.className = 'w-chess-square ' + ((f + r) % 2 === 0 ? 'light' : 'dark');
           if (chessLastMoveSquares.includes(square)) cell.classList.add('last-move');
-          cell.textContent = piece ? CHESS_PIECES[piece.color + piece.type] : '';
+          cell.innerHTML = piece ? chessPieceMarkup(piece, true) : '';
           boardEl.appendChild(cell);
         }
       }
