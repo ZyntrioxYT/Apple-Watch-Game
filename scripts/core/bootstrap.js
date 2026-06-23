@@ -29,6 +29,8 @@
     let lbFilter = 'alltime';
     let lbUnsub  = null;
     let activeGame = localStorage.getItem('activeGame') || 'reaction';
+    let premiumState = { active: false, source: 'free', renewsAt: null };
+    let pendingPremiumGame = null;
     const GUEST_ID_KEY = 'reactionGuestId';
     const GAME_CONFIG = {
       reaction: {
@@ -53,6 +55,13 @@
         scoreLabel: value => value + ' CPS',
         rating: cpsRatingFor
       },
+      chimp: {
+        title: 'Chimp Test',
+        hasScores: false,
+        premiumOnly: true,
+        scoreLabel: value => 'Level ' + value,
+        rating: () => ({ label: 'Memory', color: '#ffffff' })
+      },
       chess: {
         title: 'Chess',
         hasScores: false,
@@ -68,6 +77,103 @@
 
     function gameConfigFor(game) {
       return GAME_CONFIG[game] || GAME_CONFIG.reaction;
+    }
+
+    function premiumPreviewEnabled() {
+      return localStorage.getItem('premiumPreviewEnabled') === '1';
+    }
+
+    function hasPremiumAccess() {
+      return !!premiumState.active || premiumPreviewEnabled();
+    }
+
+    function premiumPriceLabel() {
+      return '£2.99/mo';
+    }
+
+    function formatPremiumDate(value) {
+      if (!value) return '';
+      const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    async function loadPremiumState() {
+      premiumState = { active: false, source: premiumPreviewEnabled() ? 'preview' : 'free', renewsAt: null };
+      if (!currentUser) {
+        updatePremiumUi();
+        return;
+      }
+      const snap = await db.collection('profiles').doc(currentUser.uid).get().catch(() => null);
+      const premium = snap?.exists ? (snap.data().premium || {}) : {};
+      premiumState = {
+        active: !!premium.active,
+        source: premium.active ? 'profile' : (premiumPreviewEnabled() ? 'preview' : 'free'),
+        renewsAt: premium.renewsAt || premium.expiresAt || null
+      };
+      updatePremiumUi();
+    }
+
+    function premiumStatusText() {
+      if (premiumState.active) {
+        const renewsAt = formatPremiumDate(premiumState.renewsAt);
+        return renewsAt ? 'Premium active until ' + renewsAt : 'Premium active';
+      }
+      if (premiumPreviewEnabled()) return 'Premium preview enabled on this device';
+      return 'Premium preview is available while billing is being wired.';
+    }
+
+    function updatePremiumUi() {
+      const badge = document.getElementById('user-premium-badge');
+      if (badge) badge.style.display = hasPremiumAccess() ? 'inline-flex' : 'none';
+      const button = document.getElementById('premium-primary-btn');
+      const status = document.getElementById('premium-modal-status');
+      const title = document.getElementById('premium-modal-title');
+      const sub = document.getElementById('premium-modal-sub');
+      if (title) title.textContent = 'Premium ' + premiumPriceLabel();
+      if (sub) {
+        const target = pendingPremiumGame && GAME_CONFIG[pendingPremiumGame]
+          ? 'Unlock ' + GAME_CONFIG[pendingPremiumGame].title + ' plus premium-only perks.'
+          : 'Unlock premium-only games, a premium badge, and deeper personal stats.';
+        sub.textContent = target;
+      }
+      if (status) status.textContent = premiumStatusText();
+      if (button) {
+        if (!currentUser) button.textContent = 'Sign in to continue';
+        else if (premiumState.active) button.textContent = 'Premium active';
+        else button.textContent = premiumPreviewEnabled() ? 'Disable premium preview' : 'Enable premium preview';
+        button.disabled = !!premiumState.active;
+      }
+    }
+
+    function openPremiumModal(game) {
+      pendingPremiumGame = GAME_CONFIG[game] ? game : null;
+      updatePremiumUi();
+      openModal('premium-overlay');
+    }
+
+    function togglePremiumPreview() {
+      localStorage.setItem('premiumPreviewEnabled', premiumPreviewEnabled() ? '0' : '1');
+      updatePremiumUi();
+      if (document.getElementById('page-profile')?.classList.contains('active')) renderProfile();
+      applyActiveGameUi();
+    }
+
+    function handlePremiumPrimaryAction() {
+      if (!currentUser) {
+        closeModal('premium-overlay');
+        openAuthModal();
+        return;
+      }
+      if (premiumState.active) return;
+      togglePremiumPreview();
+    }
+
+    function ensurePremiumAccess(game) {
+      if (!GAME_CONFIG[game]?.premiumOnly) return true;
+      if (hasPremiumAccess()) return true;
+      openPremiumModal(game);
+      return false;
     }
 
     function getGuestId() {
@@ -115,6 +221,7 @@
         allTimeBest = null;
         resetRankedState(false);
       }
+      await loadPremiumState();
       await loadRankedRatings();
       if (user) await restoreRankedSession();
       subscribeLeaderboard();
@@ -211,6 +318,7 @@
 
     async function selectGame(game) {
       if (!GAME_CONFIG[game]) return;
+      if (!ensurePremiumAccess(game)) return;
       if (typeof abandonRankedMatch === 'function') abandonRankedMatch('left_match');
       stopGame();
       activeGame = game;
@@ -224,20 +332,25 @@
     }
 
     function applyActiveGameUi() {
+      if (gameConfig().premiumOnly && !hasPremiumAccess()) activeGame = 'reaction';
       document.body.classList.toggle('chess-mode', activeGame === 'chess');
       document.getElementById('reaction-panel').classList.toggle('hidden', activeGame !== 'reaction');
       document.getElementById('aim-panel').classList.toggle('hidden', activeGame !== 'aim');
       document.getElementById('cps-panel').classList.toggle('hidden', activeGame !== 'cps');
+      document.getElementById('chimp-panel').classList.toggle('hidden', activeGame !== 'chimp');
       document.getElementById('chess-panel').classList.toggle('hidden', activeGame !== 'chess');
       document.getElementById('chess-bot-row').style.display = activeGame === 'chess' && !isRankedLiveGame('chess') ? 'grid' : 'none';
-      document.getElementById('difficulty-row').style.display = (activeGame === 'chess' || activeGame === 'cps') ? 'none' : 'flex';
-      document.getElementById('btn-row').style.display = (activeGame === 'chess' || activeGame === 'cps') ? 'none' : 'flex';
+      document.getElementById('difficulty-row').style.display = (activeGame === 'chess' || activeGame === 'cps' || activeGame === 'chimp') ? 'none' : 'flex';
+      document.getElementById('btn-row').style.display = (activeGame === 'chess' || activeGame === 'cps' || activeGame === 'chimp') ? 'none' : 'flex';
       document.getElementById('game-mode-title').textContent = gameConfig().title;
       if (gameConfig().hasScores === false) {
         clearUnsupportedLeaderboards();
       }
       if (activeGame === 'chess') {
         initChessGame();
+      }
+      if (activeGame === 'chimp') {
+        initChimpGame();
       }
       if (activeGame === 'cps' && !isRankedLiveGame('cps')) resetCpsGame();
       renderRankedPanel();

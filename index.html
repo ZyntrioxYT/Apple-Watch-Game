@@ -188,6 +188,23 @@
     </div>
   </div>
 
+  <div id="premium-overlay" class="modal-overlay" onclick="handleOverlayClick(event,'premium-overlay')">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="premium-modal-badge">PREMIUM</div>
+      <h2 id="premium-modal-title">Premium £2.99/mo</h2>
+      <p id="premium-modal-sub" class="premium-modal-sub">Unlock premium-only games, a premium badge, and deeper personal stats.</p>
+      <div class="premium-benefits">
+        <div class="premium-benefit"><span>♛</span><div><strong>Premium-only games</strong><span>Chimp Test and future releases.</span></div></div>
+        <div class="premium-benefit"><span>★</span><div><strong>Premium badge</strong><span>Stand out on your profile and account card.</span></div></div>
+        <div class="premium-benefit"><span>▣</span><div><strong>Extra stats</strong><span>Get added personal performance insights.</span></div></div>
+      </div>
+      <div id="premium-modal-status" class="premium-modal-status"></div>
+      <button class="auth-submit" id="premium-primary-btn" onclick="handlePremiumPrimaryAction()">Enable premium preview</button>
+      <button class="modal-close" onclick="closeModal('premium-overlay')">Close</button>
+    </div>
+  </div>
+
   <!-- ─── PAGES ──────────────────────────────────────────── -->
   <div id="pages">
 
@@ -195,6 +212,13 @@
     <div id="page-selector" class="page active">
       <div class="page-header">
         <span class="page-title">Games</span>
+      </div>
+      <div class="premium-strip">
+        <div>
+          <div class="premium-strip-title">Premium</div>
+          <div class="premium-strip-sub">£2.99/month for premium-only games and extra stats.</div>
+        </div>
+        <button class="premium-strip-btn" onclick="openPremiumModal()">View</button>
       </div>
       <div class="selector-grid">
         <div class="game-card" onclick="selectGame('reaction')">
@@ -245,6 +269,18 @@
             <span class="game-pill">Watch Ready</span>
           </div>
         </div>
+        <div class="game-card premium-card" onclick="selectGame('chimp')">
+          <div class="game-card-icon premium-icon">🧠</div>
+          <div>
+            <div class="game-card-title">Chimp Test <span class="premium-tag-inline">Premium</span></div>
+            <div class="game-card-sub">Memorize flashed numbers, then tap the hidden tiles back in order as the sequence gets longer.</div>
+          </div>
+          <div class="game-card-meta">
+            <span class="game-pill">Working Memory</span>
+            <span class="game-pill">Premium</span>
+            <span class="game-pill">Fast Recall</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -254,6 +290,7 @@
         <div id="user-info" style="display:none;align-items:center;gap:8px;">
           <img id="user-photo" src="" alt="">
           <span id="user-name"></span>
+          <span id="user-premium-badge" class="premium-badge" style="display:none;">Premium</span>
           <button class="auth-btn" id="sign-out-btn" onclick="signOut()">Sign out</button>
         </div>
         <button class="auth-btn" id="sign-in-btn" onclick="openAuthModal()">Sign in</button>
@@ -323,6 +360,21 @@
           <button id="cps-button" onclick="handleCpsTap()">Start</button>
           <div id="cps-info">10 second test</div>
           <div id="cps-sub">Tap to begin</div>
+        </div>
+
+        <div id="chimp-panel" class="game-mode-panel hidden">
+          <div id="chimp-status">Chimp Test</div>
+          <div id="chimp-sub">Memorize the numbers, then tap them back in order.</div>
+          <div id="chimp-board"></div>
+          <div id="chimp-hud">
+            <div class="aim-hud-card"><div class="val" id="chimp-level-val">4</div><div class="lbl">Level</div></div>
+            <div class="aim-hud-card"><div class="val" id="chimp-best-val">0</div><div class="lbl">Best</div></div>
+            <div class="aim-hud-card"><div class="val" id="chimp-lives-val">1</div><div class="lbl">Lives</div></div>
+          </div>
+          <div id="chimp-actions">
+            <button class="game-btn" onclick="startChimpGame()">Start run</button>
+            <button class="game-btn" onclick="resetChimpGame()">Reset</button>
+          </div>
         </div>
 
         <div id="btn-row">
@@ -462,6 +514,7 @@
   <script src="scripts/core/bootstrap.js"></script>
   <script src="scripts/games/reaction.js"></script>
   <script src="scripts/games/aim.js"></script>
+  <script src="scripts/games/chimp.js"></script>
   <script src="scripts/games/pc-chess.js"></script>
   <script src="scripts/social/leaderboards-profile.js"></script>
   <script src="scripts/social/friends-online.js"></script>

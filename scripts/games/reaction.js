@@ -858,6 +858,7 @@
     function startGame() {
       if (activeGame === 'cps') { startCpsGame(); return; }
       if (activeGame === 'aim') { startAimGame(); return; }
+      if (activeGame === 'chimp') { startChimpGame(); return; }
       if (isRankedLiveGame('reaction')) return;
       running=true; streak=0; sessionTimes=[];
       setArc(0);
@@ -867,6 +868,7 @@
     function stopGame() {
       if (activeGame === 'cps') { if (!isRankedLiveGame('cps')) resetCpsGame(); return; }
       if (activeGame === 'aim') { stopAimGame(); return; }
+      if (activeGame === 'chimp') { stopChimpGame(); return; }
       if (isRankedLiveGame('reaction')) return;
       running=false; waiting=false; ready=false;
       clearTimeout(timeout); clearTimeout(nextRoundTimeout); clearTimeout(windowTimeout);
@@ -908,6 +910,7 @@
     function handleTap() {
       if (activeGame === 'cps') { handleCpsTap(); return; }
       if (activeGame === 'aim') return;
+      if (activeGame === 'chimp') return;
       if (isRankedLiveGame('reaction')) { handleRankedReactionTap(); return; }
       if (waiting && !ready) {
         clearTimeout(timeout); streak=0;

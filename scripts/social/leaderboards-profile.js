@@ -142,19 +142,21 @@
       const reaction = counts.reaction || 0;
       const aim = counts.aim || 0;
       const chess = counts.chess || 0;
+      const chimp = counts.chimp || 0;
       const cps = counts.cps || 0;
-      if (!reaction && !aim && !chess && !cps) return '—';
+      if (!reaction && !aim && !chess && !chimp && !cps) return '—';
       const entries = [
         ['Reaction Time', reaction],
         ['Aim Trainer', aim],
         ['Chess', chess],
+        ['Chimp Test', chimp],
         ['CPS Test', cps]
       ];
       return entries.sort((a, b) => b[1] - a[1])[0][0];
     }
 
     function getProfilePlayCounts(profile, options) {
-      const counts = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, profile?.gamePlays || {});
+      const counts = Object.assign({ reaction: 0, aim: 0, chess: 0, chimp: 0, cps: 0 }, profile?.gamePlays || {});
       if (options?.includeLocalCps) {
         counts.cps = Math.max(counts.cps || 0, getWatchCpsPlays());
       }
@@ -195,6 +197,11 @@
           meta: 'No leaderboard'
         },
         {
+          label: 'Chimp Test',
+          value: statsByGame.chimp.best ? 'Level ' + statsByGame.chimp.best : 'No score',
+          meta: counts.chimp ? counts.chimp + ' plays' : 'Premium only'
+        },
+        {
           label: 'Watch CPS',
           value: statsByGame.cps.best,
           meta: counts.cps ? counts.cps + ' plays' : 'Watch only'
@@ -217,7 +224,7 @@
       const ref = db.collection('profiles').doc(player.id);
       const snap = await ref.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
-      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, current.gamePlays || {});
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, chimp: 0, cps: 0 }, current.gamePlays || {});
       gamePlays[game] = (gamePlays[game] || 0) + 1;
       await ref.set({
         uid: player.uid,
@@ -234,7 +241,7 @@
       const ref = db.collection('profiles').doc(player.id);
       const snap = await ref.get().catch(() => null);
       const current = snap?.exists ? snap.data() : {};
-      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, cps: 0 }, current.gamePlays || {});
+      const gamePlays = Object.assign({ reaction: 0, aim: 0, chess: 0, chimp: 0, cps: 0 }, current.gamePlays || {});
       gamePlays[activeGame] = (gamePlays[activeGame] || 0) + 1;
       const profile = {
         uid: player.uid,
@@ -518,6 +525,7 @@
       const statsByGame = {
         reaction: { best: null },
         aim: { best: null },
+        chimp: { best: typeof getChimpBestLevel === 'function' ? getChimpBestLevel() : 0 },
         cps: { best: formatCpsBest() }
       };
       const [reactionSnap, aimSnap] = await Promise.all([
@@ -531,7 +539,24 @@
       const mostPlayed = profileData.mostPlayedGame || mostPlayedGameFromProfile(profileData, { includeLocalCps: true });
       const reactionBest = statsByGame.reaction.best !== null ? gameConfigFor('reaction').scoreLabel(statsByGame.reaction.best) : '—';
       const aimBest = statsByGame.aim.best !== null ? gameConfigFor('aim').scoreLabel(statsByGame.aim.best) : '—';
-      const chessPlays = counts.chess || 0;
+      const premiumActive = hasPremiumAccess();
+      const premiumButton = premiumState.active ? 'Premium active' : (premiumPreviewEnabled() ? 'Disable premium preview' : 'Enable premium preview');
+      const reactionLocalEntries = (() => {
+        try { return JSON.parse(localStorage.getItem('reactionLocalLeaderboard') || '[]').length; }
+        catch (err) { return 0; }
+      })();
+      const aimLocalEntries = (() => {
+        try { return JSON.parse(localStorage.getItem('aimLocalLeaderboard') || '[]').length; }
+        catch (err) { return 0; }
+      })();
+      const premiumInsightCards = premiumActive
+        ? '<div class="stats-grid" style="margin-bottom:0;">'+
+            '<div class="stat-card"><div class="stat-val">'+(statsByGame.chimp.best || 0)+'</div><div class="stat-lbl">Chimp best</div></div>'+
+            '<div class="stat-card"><div class="stat-val">'+reactionLocalEntries+'</div><div class="stat-lbl">Reaction local entries</div></div>'+
+            '<div class="stat-card"><div class="stat-val">'+aimLocalEntries+'</div><div class="stat-lbl">Aim local entries</div></div>'+
+            '<div class="stat-card"><div class="stat-val">'+(typeof getChimpLocalPlays === "function" ? getChimpLocalPlays() : 0)+'</div><div class="stat-lbl">Chimp runs</div></div>'+
+          '</div>'
+        : '<div class="premium-locked-copy">Premium unlocks Chimp Test and extra personal stats.</div>';
 
       // achievements
       checkAchievements();
@@ -545,7 +570,7 @@
 
       el.innerHTML =
         '<div class="profile-avatar-wrap">'+avatarHtml+'</div>'+
-        '<div class="profile-name" id="profile-name-display">'+escHtml(currentUser.displayName||currentUser.email||'Player')+'</div>'+
+        '<div class="profile-name" id="profile-name-display">'+escHtml(currentUser.displayName||currentUser.email||'Player')+(premiumActive ? ' <span class="premium-badge inline">Premium</span>' : '')+'</div>'+
         '<div style="margin-bottom:4px;"><button onclick="toggleNameEdit()" style="background:none;border:none;color:var(--text-dim);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;padding:2px 6px;border-radius:6px;border:1px solid var(--border);">✏️ Edit name</button></div>'+
         '<div id="name-edit-row" style="display:none;margin-bottom:14px;gap:8px;flex-direction:column;align-items:center;">'+
           '<input id="name-edit-input" style="background:rgba(255,255,255,0.07);border:1px solid var(--border);border-radius:12px;color:white;font-size:16px;padding:10px 14px;outline:none;font-family:inherit;width:100%;max-width:260px;text-align:center;" maxlength="20" placeholder="New display name">'+
@@ -562,8 +587,18 @@
           '<div class="stat-card"><div class="stat-val">'+escHtml(reactionBest)+'</div><div class="stat-lbl">Reaction best</div></div>'+
           '<div class="stat-card"><div class="stat-val">'+escHtml(aimBest)+'</div><div class="stat-lbl">Aim best</div></div>'+
         '</div>'+
+        '<div class="profile-section-title">Premium</div>'+
+        '<div class="premium-profile-card">'+
+          '<div class="premium-profile-head"><span>Premium '+premiumPriceLabel()+'</span><span class="premium-badge '+(premiumActive ? '' : 'muted')+'">'+(premiumActive ? 'Unlocked' : 'Locked')+'</span></div>'+
+          '<div class="premium-profile-sub">'+escHtml(premiumStatusText())+'</div>'+
+          '<div class="premium-profile-actions">'+
+            '<button class="text-btn" onclick="openPremiumModal()">'+escHtml(premiumState.active ? 'Manage plan' : premiumButton)+'</button>'+
+          '</div>'+
+        '</div>'+
         '<div class="profile-section-title">Game overview</div>'+
         '<div class="player-detail-list">'+profileGameRows(profileData, statsByGame, { includeLocalCps: true })+'</div>'+
+        '<div class="profile-section-title">Premium Insights</div>'+
+        premiumInsightCards+
         '<div class="profile-section-title">Friends</div>'+
         '<div class="friends-search-row">'+
           '<input class="friends-search-input" id="friend-search-input" placeholder="Search by display name..." maxlength="30" oninput="onFriendSearch(this.value)">'+
@@ -642,7 +677,7 @@
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         await db.collection('presence').doc(currentUser.uid).update({ name });
-        document.getElementById('profile-name-display').textContent = name;
+        document.getElementById('profile-name-display').innerHTML = escHtml(name) + (hasPremiumAccess() ? ' <span class="premium-badge inline">Premium</span>' : '');
         document.getElementById('user-name').textContent = name;
         document.getElementById('name-edit-row').style.display = 'none';
         showAchieveToast({ icon: '✅', name: 'Name updated!' });
