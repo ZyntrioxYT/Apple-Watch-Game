@@ -480,7 +480,7 @@
 
     function watchRankedQueue(ref) {
       clearRankedQueueWatcher();
-      rankedQueueUnsub = ref.onSnapshot(snap => {
+      rankedQueueUnsub = ref.onSnapshot(async snap => {
         if (!snap.exists) {
           clearRankedQueueState();
           rankedStatus = 'idle';
@@ -489,8 +489,14 @@
         }
         const data = snap.data();
         setRankedQueueState(snap.id, data.joinedAtMs);
-        if (data.matchId) openRankedMatch(data.matchId);
-        if (data.status === 'canceled' || data.status === 'expired') {
+        if (data.status === 'matched' && data.matchId) {
+          const opened = await resolveRankedQueueMatch(ref, data);
+          if (!opened) {
+            clearRankedQueueState();
+            rankedStatus = 'idle';
+          }
+        }
+        if (data.status === 'canceled' || data.status === 'expired' || data.status === 'complete') {
           clearRankedQueueState();
           rankedStatus = 'idle';
           clearRankedQueueWatcher();
@@ -542,11 +548,32 @@
           if (data.matchId !== matchId || data.status !== 'matched') return null;
           return ref.set({
             status: 'complete',
+            matchId: firebase.firestore.FieldValue.delete(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
         }).catch(() => null);
       });
       await Promise.all(writes);
+    }
+
+    async function resolveRankedQueueMatch(queueRef, queueData) {
+      if (!queueData?.matchId) return false;
+      const matchSnap = await db.collection('rankedMatches').doc(queueData.matchId).get().catch(() => null);
+      if (matchSnap?.exists) {
+        const matchData = matchSnap.data();
+        if (matchData?.state !== 'complete') {
+          openRankedMatch(queueData.matchId);
+          return true;
+        }
+        await clearMatchedQueueForMatch(queueData.matchId, matchData);
+      } else if (queueRef) {
+        await queueRef.set({
+          status: 'canceled',
+          matchId: firebase.firestore.FieldValue.delete(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
+      return false;
     }
 
     async function tryMatchmakeCurrentQueue() {
@@ -558,8 +585,9 @@
         return;
       }
       const own = ownSnap.data();
-      if (own.matchId) {
-        openRankedMatch(own.matchId);
+      if (own.status === 'matched' && own.matchId) {
+        const opened = await resolveRankedQueueMatch(ownRef, own);
+        if (!opened) resetRankedState(false);
         return;
       }
       if (own.expiresAtMs < Date.now()) {
@@ -653,20 +681,7 @@
           return;
         }
         if (data.status === 'matched' && data.matchId) {
-          const matchSnap = await db.collection('rankedMatches').doc(data.matchId).get().catch(() => null);
-          if (matchSnap?.exists) {
-            const matchData = matchSnap.data();
-            if (matchData?.state !== 'complete') {
-              openRankedMatch(data.matchId);
-              return;
-            }
-            await clearMatchedQueueForMatch(data.matchId, matchData);
-          } else {
-            await ref.set({
-              status: 'canceled',
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true }).catch(() => {});
-          }
+          if (await resolveRankedQueueMatch(ref, data)) return;
           continue;
         }
         if (data.status === 'searching') {

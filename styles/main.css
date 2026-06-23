@@ -177,7 +177,18 @@
     .chess-square.legal { box-shadow:inset 0 0 0 999px rgba(255,215,0,0.16); }
     .chess-square.last-move { box-shadow:inset 0 0 0 999px rgba(77,184,255,0.24); }
     .chess-square.last-move::after { content:''; position:absolute; inset:8%; border:2px solid rgba(255,255,255,0.8); border-radius:8px; pointer-events:none; }
-    .chess-piece-svg { width:100%; height:100%; max-width:42px; max-height:42px; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.18)); pointer-events:none; }
+    .chess-piece-glyph {
+      display:block;
+      font-size:clamp(28px, 4vw, 46px);
+      line-height:1;
+      font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols 2","Arial Unicode MS",sans-serif;
+      filter:drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+      pointer-events:none;
+      user-select:none;
+      transform:translateY(1px);
+    }
+    .chess-piece-glyph.white { color:#f6f0df; text-shadow:0 0 0.6px #20242d, 0 1px 0 rgba(0,0,0,0.35); }
+    .chess-piece-glyph.black { color:#1d2430; text-shadow:0 0 0.6px #dfe6ef, 0 1px 0 rgba(0,0,0,0.18); }
     #chess-status { font-size:15px; font-weight:800; min-height:22px; margin-bottom:8px; }
     #chess-moves { width:min(86vw, 340px); max-height:120px; overflow-y:auto; text-align:left; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px; font-size:12px; color:var(--text-dim); margin-bottom:10px; line-height:1.55; }
     #chess-controls { display:flex; gap:8px; width:min(86vw, 340px); }
@@ -638,7 +649,17 @@
     .w-chess-square.light { background:#d8c9a3; color:#111; }
     .w-chess-square.dark { background:#6d8755; color:#111; }
     .w-chess-square.last-move { box-shadow:inset 0 0 0 999px rgba(77,184,255,0.28); }
-    .w-chess-piece-svg { width:100%; height:100%; max-width:15px; max-height:15px; pointer-events:none; }
+    .w-chess-piece-glyph {
+      display:block;
+      font-size:13px;
+      line-height:1;
+      font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols 2","Arial Unicode MS",sans-serif;
+      pointer-events:none;
+      user-select:none;
+      transform:translateY(0.5px);
+    }
+    .w-chess-piece-glyph.white { color:#f6f0df; text-shadow:0 0 0.5px #20242d; }
+    .w-chess-piece-glyph.black { color:#1d2430; text-shadow:0 0 0.5px #dfe6ef; }
     #w-chess-controls { display:flex; gap:5px; }
     #w-chess-controls button { flex:1; border:none; border-radius:10px; padding:7px 4px; font-size:10px; font-weight:800; font-family:inherit; background:rgba(255,255,255,0.1); color:white; }
 
