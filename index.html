@@ -154,8 +154,32 @@
         <div class="player-detail-row"><span>Player ID</span><span id="pm-player-id">—</span></div>
       </div>
       <button id="pm-challenge-btn" class="friend-btn challenge" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:8px;display:none;" onclick="sendLiveChallenge()">⚡ Challenge</button>
+      <button id="pm-chat-btn" class="friend-btn chat" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:8px;display:none;" onclick="openFriendChatFromProfile()">💬 Chat</button>
       <button id="pm-friend-btn" class="friend-btn add" style="width:100%;padding:12px;border-radius:13px;font-size:14px;margin-bottom:10px;display:none;" onclick="pmFriendAction()"></button>
       <button class="modal-close" onclick="closeModal('player-overlay')">Close</button>
+    </div>
+  </div>
+
+  <!-- ─── FRIEND CHAT modal ─────────────────────────────────── -->
+  <div id="chat-overlay" class="modal-overlay" onclick="handleOverlayClick(event,'chat-overlay')">
+    <div class="modal-sheet chat-sheet">
+      <div class="modal-handle"></div>
+      <div class="chat-head">
+        <img id="chat-photo" class="chat-avatar" src="" alt="" referrerpolicy="no-referrer">
+        <div class="chat-avatar-ph" id="chat-photo-ph">👤</div>
+        <div class="chat-head-text">
+          <div id="chat-name" class="chat-name">Friend</div>
+          <div id="chat-status" class="chat-status">Messages</div>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-messages">
+        <div class="friends-empty">Loading chat...</div>
+      </div>
+      <form class="chat-compose" onsubmit="sendFriendChatMessage(event)">
+        <input id="chat-input" class="chat-input" maxlength="500" autocomplete="off" placeholder="Message a friend...">
+        <button id="chat-send-btn" class="chat-send-btn" type="submit">Send</button>
+      </form>
+      <button class="modal-close" onclick="closeFriendChat()">Close</button>
     </div>
   </div>
 

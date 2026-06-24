@@ -486,6 +486,11 @@
         cbtn.style.display = 'none';
       }
 
+      const chatBtn = document.getElementById('pm-chat-btn');
+      if (chatBtn) {
+        chatBtn.style.display = currentUser && uid && uid !== currentUser.uid && myFriends.has(uid) ? 'block' : 'none';
+      }
+
       // friend button
       const btn = document.getElementById('pm-friend-btn');
       if (currentUser && uid && uid !== currentUser.uid) {

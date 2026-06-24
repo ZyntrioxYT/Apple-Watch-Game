@@ -348,6 +348,8 @@
     let pendingIn  = new Set();      // received requests (their uid)
     let friendsUnsub = null, requestsInUnsub = null, requestsOutUnsub = null;
     let pmCurrentUid = null;         // uid shown in player modal
+    let activeChatUid = null;
+    let activeChatUnsub = null;
 
     function setFriendsStatus(message, type) {
       const el = document.getElementById('friends-status');
@@ -401,6 +403,7 @@
         if (friendsUnsub) friendsUnsub();
         if (requestsInUnsub) requestsInUnsub();
         if (requestsOutUnsub) requestsOutUnsub();
+        closeFriendChat();
         myFriends.clear();
         pendingIn.clear();
         pendingOut.clear();
@@ -519,12 +522,16 @@
         : myFriends.has(uid) && gameConfig().hasScores !== false
           ? '<button class="friend-btn pending square" disabled>⚡</button>'
         : '';
+      const chatBtn = myFriends.has(uid)
+        ? '<button class="friend-btn chat square" onclick="event.stopPropagation();openFriendChat(\''+uid+'\')">💬</button>'
+        : '';
       return '<div class="friend-item" onclick="openFriendProfileFromCard(this)" data-rank="'+escHtml(rank)+'" data-player="'+profileData+'">'+avatar+
         '<div class="friend-info">'+
           '<div class="friend-name">'+escHtml(data.name)+onlineDot+'</div>'+
           '<div class="friend-sub">'+escHtml(score)+(online?' · Online now':'')+'</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;">'+
+          chatBtn+
           challengeBtn+
           '<button class="friend-btn remove" onclick="event.stopPropagation();removeFriend(\''+uid+'\');renderFriendsPage()">Remove</button>'+
         '</div></div>';
@@ -536,6 +543,139 @@
         openPlayerModal(s, card.dataset.rank || 'Friend', s.uid);
       } catch (err) {
         console.error('Could not open friend profile:', err);
+      }
+    }
+
+    function friendChatIdFor(uid) {
+      if (!currentUser || !uid) return '';
+      return [currentUser.uid, uid].sort().join('_');
+    }
+
+    function chatTimestampLabel(value) {
+      if (!value) return 'Now';
+      const date = typeof value.toDate === 'function' ? value.toDate() : new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Now';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderChatMessages(snap) {
+      const el = document.getElementById('chat-messages');
+      if (!el) return;
+      if (!snap || snap.empty) {
+        el.innerHTML = '<div class="friends-empty">No messages yet</div>';
+        return;
+      }
+      el.innerHTML = '';
+      snap.docs.forEach(doc => {
+        const data = doc.data();
+        const mine = data.from === currentUser?.uid;
+        el.insertAdjacentHTML('beforeend',
+          '<div class="chat-row '+(mine ? 'mine' : 'theirs')+'">'+
+            '<div class="chat-bubble">'+escHtml(data.text || '')+'</div>'+
+            '<div class="chat-time">'+escHtml(chatTimestampLabel(data.createdAt))+'</div>'+
+          '</div>');
+      });
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function openFriendChat(uid) {
+      if (!currentUser) { openAuthModal(); return; }
+      if (!uid || uid === currentUser.uid || !myFriends.has(uid)) {
+        setFriendsStatus('You can only chat with confirmed friends.', 'error');
+        return;
+      }
+      activeChatUid = uid;
+      const data = await getPlayerCardData(uid).catch(() => ({ name: 'Friend', photoURL: '' }));
+      document.getElementById('chat-name').textContent = data.name || 'Friend';
+      document.getElementById('chat-status').textContent = onlineUsers.has(uid) ? 'Online now' : 'Messages';
+      const photo = document.getElementById('chat-photo');
+      const ph = document.getElementById('chat-photo-ph');
+      if (data.photoURL) {
+        photo.src = data.photoURL;
+        photo.style.display = 'block';
+        ph.style.display = 'none';
+      } else {
+        photo.style.display = 'none';
+        ph.style.display = 'flex';
+      }
+      const input = document.getElementById('chat-input');
+      if (input) input.value = '';
+      document.getElementById('chat-messages').innerHTML = '<div class="friends-empty">Loading chat...</div>';
+      openModal('chat-overlay');
+      if (activeChatUnsub) activeChatUnsub();
+      const chatId = friendChatIdFor(uid);
+      const chatRef = db.collection('friendChats').doc(chatId);
+      await chatRef.set({
+        participants: [currentUser.uid, uid].sort(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        participantNames: {
+          [currentUser.uid]: currentUser.displayName || 'Player',
+          [uid]: data.name || 'Friend'
+        }
+      }, { merge: true }).catch(err => {
+        console.error('Friend chat init failed:', err);
+        setFriendsStatus('Chat could not start. Your Firestore rules must allow friendChats writes.', 'error');
+      });
+      activeChatUnsub = chatRef.collection('messages')
+        .orderBy('createdAt', 'asc')
+        .limit(80)
+        .onSnapshot(renderChatMessages, err => {
+          console.error('Friend chat error:', err);
+          document.getElementById('chat-messages').innerHTML = '<div class="friends-empty">Chat could not load. Check Firestore rules.</div>';
+        });
+      setTimeout(() => input?.focus(), 80);
+    }
+
+    function openFriendChatFromProfile() {
+      const uid = pmCurrentUid;
+      closeModal('player-overlay');
+      openFriendChat(uid);
+    }
+
+    function closeFriendChat() {
+      if (activeChatUnsub) activeChatUnsub();
+      activeChatUnsub = null;
+      activeChatUid = null;
+      closeModal('chat-overlay');
+    }
+
+    async function sendFriendChatMessage(event) {
+      if (event) event.preventDefault();
+      const input = document.getElementById('chat-input');
+      const btn = document.getElementById('chat-send-btn');
+      const text = (input?.value || '').trim();
+      const toUid = activeChatUid;
+      if (!currentUser || !toUid || !myFriends.has(toUid) || !text) return;
+      if (btn) btn.disabled = true;
+      try {
+        const chatId = friendChatIdFor(toUid);
+        const chatRef = db.collection('friendChats').doc(chatId);
+        const msgRef = chatRef.collection('messages').doc();
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+        const batch = db.batch();
+        batch.set(chatRef, {
+          participants: [currentUser.uid, toUid].sort(),
+          updatedAt: now,
+          lastMessage: text.slice(0, 120),
+          lastSender: currentUser.uid,
+          participantNames: {
+            [currentUser.uid]: currentUser.displayName || 'Player',
+            [toUid]: document.getElementById('chat-name')?.textContent || 'Friend'
+          }
+        }, { merge: true });
+        batch.set(msgRef, {
+          from: currentUser.uid,
+          to: toUid,
+          text,
+          createdAt: now
+        });
+        await batch.commit();
+        if (input) input.value = '';
+      } catch (err) {
+        console.error('Friend chat send failed:', err);
+        setFriendsStatus('Message failed. Your Firestore rules must allow friendChats writes.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -699,7 +839,7 @@
     // ── Keyboard ──────────────────────────────────────────────
     document.addEventListener('keydown', e=>{
       if(document.getElementById('auth-overlay').classList.contains('open')){ if(e.key==='Enter') submitAuth(); return; }
-      if(e.key==='Escape'){ ['auth-overlay','player-overlay','mp-overlay','challenge-overlay'].forEach(closeModal); declineChallenge(); return; }
+      if(e.key==='Escape'){ ['auth-overlay','player-overlay','mp-overlay','challenge-overlay'].forEach(closeModal); closeFriendChat(); declineChallenge(); return; }
       if((e.key==='Enter'||e.key===' ')&&document.getElementById('page-game').classList.contains('active')){
         e.preventDefault();
         if (activeGame === 'aim') {
@@ -711,4 +851,3 @@
     });
 
     function escHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
