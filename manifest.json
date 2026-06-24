@@ -1,7 +1,7 @@
 {
-  "name": "Rapid Response",
-  "short_name": "Rapid Response",
-  "description": "Test your response time and compete on the global leaderboard",
+  "name": "Apple Watch Games",
+  "short_name": "Apple Games",
+  "description": "Need Something fun to play on nearly any device when you are bored, you've come to the right place",
   "start_url": "/Apple-Watch-Game/",
   "display": "fullscreen",
   "background_color": "#111111",
